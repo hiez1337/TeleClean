@@ -411,6 +411,15 @@ class TelegramClientWrapper:
                 await self.client.download_profile_photo(
                     entity, file=str(avatar_path)
                 )
+                # Validate JPEG integrity — delete corrupt files
+                if avatar_path.stat().st_size > 0:
+                    try:
+                        from PIL import Image as PILImage
+                        with PILImage.open(avatar_path) as img:
+                            img.verify()
+                    except Exception:
+                        logger.warning("Corrupt avatar for channel %d, deleting", entity.id)
+                        avatar_path.unlink(missing_ok=True)
             except Exception as exc:
                 logger.debug("No avatar for channel %d: %s", entity.id, exc)
 

@@ -130,12 +130,14 @@ class AsyncWorker(QThread):
             except CancelledError:
                 logger.debug("Async operation cancelled")
             except Exception as exc:
-                logger.exception("Async operation failed")
                 if on_error is not None:
+                    logger.debug("Async operation failed (handled): %s", exc)
                     # Capture exc in closure via default argument (PEP 626)
                     self._callback_dispatch.emit(
                         lambda e=exc: on_error(e)
                     )
+                else:
+                    logger.exception("Async operation failed (unhandled)")
 
         future.add_done_callback(_done)
         return future
