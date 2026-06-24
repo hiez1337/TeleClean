@@ -12,6 +12,7 @@ pyinstaller ^
     --name "TeleClean" ^
     --add-data "app\gui\styles\telegram_dark.qss;app\gui\styles" ^
     --add-data "app\gui\styles\telegram_light.qss;app\gui\styles" ^
+    --add-data "keys.json;." ^
     --hidden-import "telethon" ^
     --hidden-import "qrcode" ^
     --hidden-import "PIL" ^

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sys
 from enum import Enum
 from typing import Callable, Optional
 
@@ -20,9 +21,19 @@ from telethon.tl.types import Channel
 from app.models.channel import Channel as ChannelModel
 from app.services.session_service import get_avatar_path, get_session_path
 
-# CI replaces these placeholders with real keys before building
+# Load embedded API keys from bundled keys.json (CI sets these at build time)
 _BUILD_API_ID = 0
 _BUILD_API_HASH = ""
+try:
+    _base = sys._MEIPASS  # PyInstaller temp dir
+except AttributeError:
+    _base = os.path.dirname(__file__)  # dev mode
+_keys_path = os.path.join(_base, "keys.json")
+if os.path.exists(_keys_path):
+    with open(_keys_path) as _f:
+        _k = __import__("json").load(_f)
+    _BUILD_API_ID = _k["api_id"]
+    _BUILD_API_HASH = _k["api_hash"]
 
 logger = logging.getLogger(__name__)
 
