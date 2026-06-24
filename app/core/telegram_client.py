@@ -20,6 +20,12 @@ from telethon.tl.types import Channel
 from app.models.channel import Channel as ChannelModel
 from app.services.session_service import get_avatar_path, get_session_path
 
+try:
+    from app.core.api_keys import API_ID as _EMBEDDED_API_ID, API_HASH as _EMBEDDED_API_HASH
+except ImportError:
+    _EMBEDDED_API_ID = None
+    _EMBEDDED_API_HASH = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -54,21 +60,19 @@ class TelegramClientWrapper:
     """
 
     def __init__(self) -> None:
-        api_id: Optional[str] = os.getenv("TELEGRAM_API_ID")
-        api_hash: Optional[str] = os.getenv("TELEGRAM_API_HASH")
+        api_id_s = os.getenv("TELEGRAM_API_ID")
+        api_hash_s = os.getenv("TELEGRAM_API_HASH")
 
-        if not api_id or not api_hash:
-            try:
-                from app.core.api_keys import API_ID, API_HASH
-                self._api_id = API_ID
-                self._api_hash = API_HASH
-            except ImportError:
-                raise RuntimeError(
-                    "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env"
-                )
+        if api_id_s and api_hash_s:
+            self._api_id = int(api_id_s)
+            self._api_hash = api_hash_s
+        elif _EMBEDDED_API_ID is not None and _EMBEDDED_API_HASH is not None:
+            self._api_id = _EMBEDDED_API_ID
+            self._api_hash = _EMBEDDED_API_HASH
         else:
-            self._api_id = int(api_id)
-            self._api_hash = api_hash
+            raise RuntimeError(
+                "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env"
+            )
         self._session_path: str = get_session_path()
 
         self.client: TelegramClient = TelegramClient(
