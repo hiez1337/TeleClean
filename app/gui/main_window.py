@@ -628,83 +628,76 @@ class MainWindow(QMainWindow):
         def L(k, v):
             lines.append(f"{k}: {v}")
 
-        L("--- Application ---", "")
-        L("Mode", "Frozen (.exe)" if getattr(_sys, 'frozen', False) else "Dev (python)")
-        L("Python", _sys.version)
-        L("PySide", "imported")
-
-        L("", "")
-        L("--- API Keys ---", "")
-        from app.services.session_service import load_api_keys
-        saved = load_api_keys()
-        env_id = os.getenv("TELEGRAM_API_ID")
-        if env_id:
-            L("Source", "Environment (.env)")
-        elif saved.get("api_id"):
-            L("Source", "Settings (config.json)")
-        else:
-            L("Source", "Built-in (telegram_client.py)")
-        L("API ID used", str(self._client._api_id) if hasattr(self._client, '_api_id') else "?")
-        L("API ID from settings", str(saved.get("api_id", "")) if saved else "not saved")
-        L("API Hash from settings", "set" if saved.get("api_hash") else "not saved")
-
-        L("", "")
-        L("--- Paths ---", "")
         try:
+            L("--- Application ---", "")
+            L("Mode", "Frozen (.exe)" if getattr(_sys, 'frozen', False) else "Dev (python)")
+            L("Python", _sys.version)
+            L("PySide", "imported")
+
+            L("", "")
+            L("--- API Keys ---", "")
+            from app.services.session_service import load_api_keys
+            saved = load_api_keys()
+            env_id = os.getenv("TELEGRAM_API_ID")
+            if env_id:
+                L("Source", "Environment (.env)")
+            elif saved.get("api_id"):
+                L("Source", "Settings (config.json)")
+            else:
+                L("Source", "Built-in (telegram_client.py)")
+            L("API ID from settings", str(saved.get("api_id", "")) if saved else "not saved")
+            L("API Hash from settings", "set ✓" if saved.get("api_hash") else "not saved")
+
+            L("", "")
+            L("--- Paths ---", "")
             from app.services.session_service import get_data_dir, get_session_path, get_avatar_cache_dir
             dd = get_data_dir()
             L("Data dir", str(dd))
-            L("Exists", str(dd.exists()))
+            L("Data dir exists", str(dd.exists()))
             sp = get_session_path()
             L("Session path", sp)
-            L("Session exists", str(dd.parent.exists()))
             av = get_avatar_cache_dir()
             L("Avatars dir", str(av))
-        except Exception as e:
-            L("Data dir", f"ERROR: {e}")
 
-        L("", "")
-        L("--- Telegram Client ---", "")
-        try:
+            L("", "")
+            L("--- Session File ---", "")
+            for sfx in (".session", ".session-journal", ".session-wal", ".session-shm"):
+                p = sp + sfx
+                if os.path.exists(p):
+                    sz = os.path.getsize(p)
+                    L(f"  {sfx}", f"exists  {sz} B")
+                else:
+                    L(f"  {sfx}", "not found")
+
+            L("", "")
+            L("--- Telegram Client ---", "")
             c = self._client
-            L("Client created", "yes")
             L("Connected", str(c.client.is_connected()))
             L("Auth state", c.auth_state.value if c.auth_state else "None")
             L("Has QR login", str(hasattr(c, '_qr_login') and c._qr_login is not None))
             if c.last_error:
                 L("Last error", c.last_error)
-            L("Telethon version", getattr(c.client, '__version__', '?'))
             L("_authorized", str(c.client._authorized))
             L("auth_key exists", str(bool(c.client.session.auth_key)))
             try:
                 L("Active DC", str(c.client.session.dc_id))
             except Exception:
                 pass
-        except Exception as e:
-            L("Client", f"ERROR: {e}")
 
-        L("", "")
-        L("--- Session File ---", "")
-        try:
-            sp = self._client._session_path
-            L("Path", sp)
-            import os
-            for sfx in (".session", ".session-journal", ".session-wal", ".session-shm"):
-                p = sp + sfx
-                if os.path.exists(p):
-                    L(f"  {sfx}", f"exists  size={os.path.getsize(p)}")
-        except Exception as e:
-            L("Session file", f"ERROR: {e}")
+            L("", "")
+            L("--- Worker ---", "")
+            L("Running", str(self._worker.isRunning()))
+            L("Loop running", str(self._worker.loop.is_running() if self._worker.loop else False))
 
-        L("", "")
-        L("--- Worker ---", "")
-        L("Running", str(self._worker.isRunning()))
-        L("Loop running", str(self._worker.loop.is_running() if self._worker.loop else False))
+        except Exception as e:
+            import traceback
+            L("ERROR", str(e))
+            L("TRACEBACK", traceback.format_exc())
 
         text = "\n".join(lines)
         dlg = QDialog(self)
         dlg.setWindowTitle("Debug Info")
-        dlg.resize(600, 500)
+        dlg.resize(640, 520)
         lay = QVBoxLayout(dlg)
         te = QTextEdit()
         te.setReadOnly(True)
