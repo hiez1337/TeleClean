@@ -2,19 +2,27 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Optional
+
+# Dialog type constants
+DIALOG_CHANNEL = "channel"
+DIALOG_SUPERGROUP = "supergroup"
+DIALOG_GROUP = "group"
+DIALOG_BOT = "bot"
+DIALOG_USER = "user"
+DIALOG_DELETED = "deleted"
 
 
 @dataclass
 class Channel:
-    """Represents a Telegram channel that the user can leave."""
+    """Represents a Telegram dialog (channel, group, bot, or user)."""
 
     id: int
     """Telegram dialog/chat ID (may be negative)."""
 
     title: str
-    """Display name of the channel."""
+    """Display name."""
 
     username: Optional[str] = None
     """Public @username, if available."""
@@ -31,6 +39,9 @@ class Channel:
     is_joined: bool = True
     """Whether the user is still a member."""
 
+    dialog_type: str = DIALOG_CHANNEL
+    """Type of dialog: channel, supergroup, group, bot, user, or deleted."""
+
     def to_dict(self) -> dict:
         """Serialize to a JSON-compatible dictionary."""
         return asdict(self)
@@ -46,4 +57,5 @@ class Channel:
             unread_count=data.get("unread_count", 0),
             is_channel=data.get("is_channel", True),
             is_joined=data.get("is_joined", True),
+            dialog_type=data.get("dialog_type", DIALOG_CHANNEL),
         )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.models.channel import Channel
+from app.models.channel import DIALOG_BOT, DIALOG_CHANNEL, DIALOG_GROUP
 
 
 class TestChannelCreation:
@@ -17,6 +18,7 @@ class TestChannelCreation:
         assert ch.unread_count == 0
         assert ch.is_channel is True
         assert ch.is_joined is True
+        assert ch.dialog_type == DIALOG_CHANNEL
 
     def test_full(self) -> None:
         ch = Channel(
@@ -27,10 +29,16 @@ class TestChannelCreation:
             unread_count=5,
             is_channel=True,
             is_joined=True,
+            dialog_type=DIALOG_GROUP,
         )
         assert ch.username == "@full"
         assert ch.participant_count == 1000
         assert ch.unread_count == 5
+        assert ch.dialog_type == DIALOG_GROUP
+
+    def test_dialog_types(self) -> None:
+        ch = Channel(id=-1, title="Bot", dialog_type=DIALOG_BOT)
+        assert ch.dialog_type == DIALOG_BOT
 
 
 class TestChannelSerialization:

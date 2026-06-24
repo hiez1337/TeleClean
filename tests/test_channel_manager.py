@@ -33,21 +33,21 @@ class TestFiltering:
 
     def test_filter_unread(self, manager: ChannelManager, sample_channels: list[Channel]) -> None:
         result = manager.filter_unread(sample_channels)
-        assert len(result) == 3  # Tech News, Python Developers, Music Lovers
+        assert len(result) == 5  # Tech News, Python Developers, Music Lovers, Dev Chat, Test Bot
         for ch in result:
             assert ch.unread_count > 0
 
     def test_filter_low_subscribers(self, manager: ChannelManager, sample_channels: list[Channel]) -> None:
         result = manager.filter_low_subscribers(sample_channels, max_count=100)
-        # Channels with <= 100 subscribers: Abandoned (15), Music Lovers (80), Empty (0)
-        assert len(result) == 3
+        # Channels with <= 100 subscribers: Abandoned (15), Music Lovers (80), Empty (0), Old Group (8), Test Bot (0), Deleted User (0)
+        assert len(result) == 6
         for ch in result:
             assert ch.participant_count <= 100
 
     def test_filter_low_subscribers_default(self, manager: ChannelManager, sample_channels: list[Channel]) -> None:
         result = manager.filter_low_subscribers(sample_channels)
-        # Default max_count=100: same 3 channels
-        assert len(result) == 3
+        # Default max_count=100: same 6 channels
+        assert len(result) == 6
 
 
 class TestSorting:

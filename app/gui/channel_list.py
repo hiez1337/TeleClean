@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.models.channel import Channel
+from app.models.channel import DIALOG_BOT, DIALOG_CHANNEL, DIALOG_DELETED, DIALOG_GROUP, DIALOG_SUPERGROUP, DIALOG_USER
 from app.services.session_service import get_avatar_path
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,43 @@ ROW_HEIGHT = 56
 MARGIN_LR = 14
 SPACING = 12
 CHECKBOX_SIZE = 18
+
+
+# ── Dialog-type subtitle config ──────────────────────────────────────
+
+_SUBTITLE_TEMPLATES: dict[str, tuple[str, list[str]]] = {
+    # (icon, parts)
+}
+
+_BUILDER: dict[str, list[str]] = {}
+
+_FILTER_LABELS: dict[str, tuple[list[str], list[str]]] = {
+    # type -> (filter_items, sort_items)
+    DIALOG_CHANNEL: (
+        ["Все каналы", "Непрочитанные", "Мало подписчиков"],
+        ["По названию", "По активности", "По подписчикам"],
+    ),
+    DIALOG_SUPERGROUP: (
+        ["Все чаты", "Непрочитанные", "Мало участников"],
+        ["По названию", "По активности", "По участникам"],
+    ),
+    DIALOG_GROUP: (
+        ["Все чаты", "Непрочитанные", "Мало участников"],
+        ["По названию", "По активности", "По участникам"],
+    ),
+    DIALOG_BOT: (
+        ["Все боты", "Непрочитанные"],
+        ["По названию", "По активности"],
+    ),
+    DIALOG_USER: (
+        ["Все диалоги", "Непрочитанные"],
+        ["По названию", "По активности"],
+    ),
+    DIALOG_DELETED: (
+        ["Все удалённые"],
+        ["По названию"],
+    ),
+}
 
 
 class ChannelDelegate(QStyledItemDelegate):
@@ -179,12 +217,31 @@ class ChannelDelegate(QStyledItemDelegate):
         painter.drawText(title_rect, Qt.AlignLeft | Qt.AlignBottom, elided)
 
         parts = []
-        if channel.participant_count > 0:
-            parts.append(f"👤 {channel.participant_count:,}")
-        if channel.unread_count > 0:
-            parts.append(f"💬 {channel.unread_count}")
-        if channel.username:
-            parts.append(f"@{channel.username}")
+        dt = channel.dialog_type
+        if dt == DIALOG_CHANNEL:
+            if channel.participant_count > 0:
+                parts.append(f"👤 {channel.participant_count:,}")
+            if channel.unread_count > 0:
+                parts.append(f"💬 {channel.unread_count}")
+            if channel.username:
+                parts.append(f"@{channel.username}")
+        elif dt in (DIALOG_SUPERGROUP, DIALOG_GROUP):
+            if channel.participant_count > 0:
+                parts.append(f"👥 {channel.participant_count}")
+            if channel.unread_count > 0:
+                parts.append(f"💬 {channel.unread_count}")
+            if channel.username:
+                parts.append(f"@{channel.username}")
+        elif dt == DIALOG_BOT:
+            parts.append("🤖")
+            if channel.username:
+                parts.append(f"@{channel.username}")
+        elif dt == DIALOG_DELETED:
+            parts.append("🗑 Удалённый аккаунт")
+        elif dt == DIALOG_USER:
+            parts.append("👤")
+            if channel.username:
+                parts.append(f"@{channel.username}")
         subtitle = " | ".join(parts) if parts else "Нет данных"
 
         font_sub = QFont()
@@ -215,8 +272,14 @@ class ChannelListWidget(QWidget):
     selection_changed = Signal(object)
     leave_requested = Signal(object)
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None, dialog_type: str = "") -> None:
         super().__init__(parent)
+
+        self._dialog_type = dialog_type or DIALOG_CHANNEL
+        filter_items, sort_items = _FILTER_LABELS.get(
+            self._dialog_type,
+            (["Все"], ["По названию"]),
+        )
 
         self._all_channels: list[Channel] = []
         self._filtered_channels: list[Channel] = []
@@ -228,9 +291,9 @@ class ChannelListWidget(QWidget):
 
         self._delegate = ChannelDelegate(self._left_ids)
 
-        self._build_ui()
+        self._build_ui(filter_items, sort_items)
 
-    def _build_ui(self) -> None:
+    def _build_ui(self, filter_items: list[str], sort_items: list[str]) -> None:
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(6)
@@ -238,7 +301,7 @@ class ChannelListWidget(QWidget):
         search_bar = QHBoxLayout()
         search_bar.setContentsMargins(0, 0, 0, 0)
         self._search_input = QLineEdit()
-        self._search_input.setPlaceholderText("🔍  Поиск каналов...")
+        self._search_input.setPlaceholderText("🔍  Поиск...")
         self._search_input.textChanged.connect(self._on_search)
         search_bar.addWidget(self._search_input)
         main_layout.addLayout(search_bar)
@@ -250,7 +313,7 @@ class ChannelListWidget(QWidget):
         filter_label.setStyleSheet("font-size: 12px; color: #AAAAAA; padding: 0px;")
         filter_row.addWidget(filter_label)
         self._filter_combo = QComboBox()
-        self._filter_combo.addItems(["Все каналы", "Непрочитанные", "Мало подписчиков"])
+        self._filter_combo.addItems(filter_items)
         self._filter_combo.currentIndexChanged.connect(self._on_filter_changed)
         filter_row.addWidget(self._filter_combo)
         filter_row.addSpacing(8)
@@ -258,7 +321,7 @@ class ChannelListWidget(QWidget):
         sort_label.setStyleSheet("font-size: 12px; color: #AAAAAA; padding: 0px;")
         filter_row.addWidget(sort_label)
         self._sort_combo = QComboBox()
-        self._sort_combo.addItems(["По названию", "По активности", "По подписчикам"])
+        self._sort_combo.addItems(sort_items)
         self._sort_combo.currentIndexChanged.connect(self._on_sort_changed)
         filter_row.addWidget(self._sort_combo)
         filter_row.addStretch()

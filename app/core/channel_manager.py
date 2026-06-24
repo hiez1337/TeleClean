@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from app.models.channel import Channel
+from app.models.channel import DIALOG_DELETED
 from app.core.telegram_client import (
     LeaveResult,
     TelegramClientWrapper,
@@ -73,7 +74,7 @@ class ChannelManager:
                 return cached
 
         # Fetch from Telegram
-        channels = await self._client.get_all_channels(
+        channels = await self._client.get_all_dialogs(
             on_progress=on_progress
         )
         self._channels = channels
@@ -121,6 +122,14 @@ class ChannelManager:
             return self._channels
         q = query.lower()
         return [ch for ch in self._channels if q in ch.title.lower()]
+
+    def get_by_type(self, dialog_type: str) -> list[Channel]:
+        """Return only dialogs matching *dialog_type*."""
+        return [ch for ch in self._channels if ch.dialog_type == dialog_type]
+
+    def get_deleted_user_chats(self) -> list[Channel]:
+        """Return dialogs with deleted-account users."""
+        return [ch for ch in self._channels if ch.dialog_type == DIALOG_DELETED]
 
     def filter_unread(self, channels: list[Channel]) -> list[Channel]:
         """Return only channels with unread messages."""
@@ -200,7 +209,7 @@ class ChannelManager:
                 break
 
             callbacks.on_progress(i + 1, total, channel.title)
-            result = await self._client.leave_channel(channel.id)
+            result = await self._client.leave_dialog(channel)
 
             if result == LeaveResult.SUCCESS:
                 success_count += 1

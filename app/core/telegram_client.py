@@ -15,9 +15,18 @@ from typing import Callable, Optional
 from telethon import TelegramClient, errors
 from telethon.sessions import SQLiteSession
 from telethon.tl.functions.channels import LeaveChannelRequest
-from telethon.tl.types import Channel
+from telethon.tl.functions.messages import DeleteChatUserRequest
+from telethon.tl.types import Channel, Chat, User
 
 from app.models.channel import Channel as ChannelModel
+from app.models.channel import (
+    DIALOG_BOT,
+    DIALOG_CHANNEL,
+    DIALOG_DELETED,
+    DIALOG_GROUP,
+    DIALOG_SUPERGROUP,
+    DIALOG_USER,
+)
 from app.services.session_service import get_avatar_path, get_session_path, load_api_keys
 
 # Built-in fallback keys (committed to repo, overwritten by CI at build time)
@@ -401,8 +410,8 @@ class TelegramClientWrapper:
     # Channel listing
     # ------------------------------------------------------------------
 
-    async def _download_avatar(self, entity: Channel, semaphore: asyncio.Semaphore) -> None:
-        """Download a channel's profile photo to the local cache."""
+    async def _download_avatar(self, entity, semaphore: asyncio.Semaphore) -> None:
+        """Download a dialog's profile photo to the local cache."""
         avatar_path = get_avatar_path(entity.id)
         if avatar_path.exists():
             return
@@ -418,25 +427,21 @@ class TelegramClientWrapper:
                         with PILImage.open(avatar_path) as img:
                             img.verify()
                     except Exception:
-                        logger.warning("Corrupt avatar for channel %d, deleting", entity.id)
+                        logger.warning("Corrupt avatar for dialog %d, deleting", entity.id)
                         avatar_path.unlink(missing_ok=True)
             except Exception as exc:
-                logger.debug("No avatar for channel %d: %s", entity.id, exc)
+                logger.debug("No avatar for dialog %d: %s", entity.id, exc)
 
-    async def get_all_channels(
+    async def get_all_dialogs(
         self,
         on_progress: Optional[Callable[[int, int], None]] = None,
     ) -> list[ChannelModel]:
-        """Fetch every channel the user is a member of.
+        """Fetch every dialog the user has.
 
         Uses Telethon's native ``get_dialogs(limit=None)`` which handles
-        pagination internally, returning all dialogs.  Filters to broadcast
-        channels only and downloads their avatars in the background.
-
-        Parameters
-        ----------
-        on_progress : callable or None
-            Called as ``on_progress(current, total)`` during processing.
+        pagination internally, returning all dialogs.  Detects channel,
+        supergroup, group, bot, user, and deleted-account dialogs.
+        Downloads avatars in the background.
         """
         dialogs = await self.client.get_dialogs(limit=None)
         total = len(dialogs)
@@ -452,23 +457,82 @@ class TelegramClientWrapper:
             if on_progress:
                 on_progress(i + 1, total)
             entity = dialog.entity
+            channel = None
+
             if isinstance(entity, Channel) and entity.broadcast:
-                channels.append(
-                    ChannelModel(
-                        id=entity.id,
-                        title=dialog.name or "Unknown",
-                        username=entity.username,
-                        participant_count=getattr(
-                            entity, "participants_count", 0
-                        ),
-                        unread_count=dialog.unread_count,
-                        is_channel=True,
-                        is_joined=True,
+                channel = ChannelModel(
+                    id=entity.id,
+                    title=dialog.name or "Unknown",
+                    username=entity.username,
+                    participant_count=getattr(entity, "participants_count", 0),
+                    unread_count=dialog.unread_count,
+                    is_channel=True,
+                    is_joined=True,
+                    dialog_type=DIALOG_CHANNEL,
+                )
+            elif isinstance(entity, Channel) and entity.megagroup:
+                channel = ChannelModel(
+                    id=entity.id,
+                    title=dialog.name or "Unknown",
+                    username=entity.username,
+                    participant_count=getattr(entity, "participants_count", 0),
+                    unread_count=dialog.unread_count,
+                    is_channel=False,
+                    is_joined=True,
+                    dialog_type=DIALOG_SUPERGROUP,
+                )
+            elif isinstance(entity, Chat):
+                channel = ChannelModel(
+                    id=entity.id,
+                    title=dialog.name or "Unknown",
+                    username=None,
+                    participant_count=getattr(entity, "participants_count", 0),
+                    unread_count=dialog.unread_count,
+                    is_channel=False,
+                    is_joined=True,
+                    dialog_type=DIALOG_GROUP,
+                )
+            elif isinstance(entity, User) and entity.bot:
+                channel = ChannelModel(
+                    id=entity.id,
+                    title=dialog.name or "Unknown",
+                    username=entity.username,
+                    participant_count=0,
+                    unread_count=dialog.unread_count,
+                    is_channel=False,
+                    is_joined=True,
+                    dialog_type=DIALOG_BOT,
+                )
+            elif isinstance(entity, User) and entity.deleted:
+                channel = ChannelModel(
+                    id=entity.id,
+                    title=dialog.name or "Unknown",
+                    username=None,
+                    participant_count=0,
+                    unread_count=dialog.unread_count,
+                    is_channel=False,
+                    is_joined=False,
+                    dialog_type=DIALOG_DELETED,
+                )
+            elif isinstance(entity, User):
+                channel = ChannelModel(
+                    id=entity.id,
+                    title=dialog.name or "Unknown",
+                    username=entity.username,
+                    participant_count=0,
+                    unread_count=dialog.unread_count,
+                    is_channel=False,
+                    is_joined=True,
+                    dialog_type=DIALOG_USER,
+                )
+
+            if channel is not None:
+                channels.append(channel)
+                # Only download avatars for channels, groups, and bots
+                if channel.dialog_type in (DIALOG_CHANNEL, DIALOG_SUPERGROUP, DIALOG_GROUP, DIALOG_BOT):
+                    avatar_tasks.append(
+                        self._download_avatar(entity, sem)
                     )
-                )
-                avatar_tasks.append(
-                    self._download_avatar(entity, sem)
-                )
 
         if avatar_tasks:
             asyncio.ensure_future(
@@ -477,15 +541,39 @@ class TelegramClientWrapper:
 
         return channels
 
+    async def get_all_channels(
+        self,
+        on_progress: Optional[Callable[[int, int], None]] = None,
+    ) -> list[ChannelModel]:
+        """Fetch every broadcast channel the user is a member of (legacy)."""
+        all_dialogs = await self.get_all_dialogs(on_progress=on_progress)
+        return [d for d in all_dialogs if d.dialog_type == DIALOG_CHANNEL]
+
     # ------------------------------------------------------------------
-    # Leaving channels
+    # Leaving channels / groups / dialogs
     # ------------------------------------------------------------------
+
+    async def leave_dialog(self, channel: ChannelModel) -> LeaveResult:
+        """Leave or delete a dialog based on its type.
+
+        - Channels / supergroups: LeaveChannelRequest
+        - Basic groups: DeleteChatUserRequest
+        - Users / bots / deleted: delete_dialog
+        """
+        dt = channel.dialog_type
+        if dt in (DIALOG_CHANNEL, DIALOG_SUPERGROUP):
+            return await self.leave_channel(channel.id)
+        elif dt == DIALOG_GROUP:
+            return await self.leave_group(channel.id)
+        elif dt in (DIALOG_USER, DIALOG_BOT, DIALOG_DELETED):
+            return await self.delete_dialog(channel.id)
+        return LeaveResult.ERROR
 
     async def leave_channel(
         self,
         channel_id: int,
     ) -> LeaveResult:
-        """Leave a single channel by its Telegram ID.
+        """Leave a channel or supergroup by its Telegram ID.
 
         Returns a ``LeaveResult`` indicating the outcome.
         """
@@ -506,4 +594,27 @@ class TelegramClientWrapper:
             return LeaveResult.NOT_FOUND
         except Exception as exc:
             logger.error("Failed to leave channel %d: %s", channel_id, exc)
+            return LeaveResult.ERROR
+
+    async def leave_group(self, chat_id: int) -> LeaveResult:
+        """Leave a basic group (Chat) by its ID."""
+        try:
+            await self.client(DeleteChatUserRequest(chat_id=chat_id, user_id="self"))
+            logger.info("Left group %d", chat_id)
+            return LeaveResult.SUCCESS
+        except errors.FloodWaitError as exc:
+            logger.warning("Rate limited on group %d, wait %ds", chat_id, exc.seconds)
+            return LeaveResult.RATE_LIMITED
+        except Exception as exc:
+            logger.error("Failed to leave group %d: %s", chat_id, exc)
+            return LeaveResult.ERROR
+
+    async def delete_dialog(self, dialog_id: int) -> LeaveResult:
+        """Delete a personal dialog (user, bot, or deleted account)."""
+        try:
+            await self.client.delete_dialog(dialog_id)
+            logger.info("Deleted dialog %d", dialog_id)
+            return LeaveResult.SUCCESS
+        except Exception as exc:
+            logger.error("Failed to delete dialog %d: %s", dialog_id, exc)
             return LeaveResult.ERROR

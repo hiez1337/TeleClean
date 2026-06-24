@@ -11,13 +11,39 @@ pytest -v --tb=short
 ## Architecture
 
 - **GUI**: PySide6 (Qt 6). Channel list uses `QStyledItemDelegate` (custom `paint()`), not widget-per-row.
+  Main window uses `QTabWidget` with 4 tabs: channels, chats, bots, deleted accounts.
 - **Telegram API**: Telethon (async). Bridged to Qt thread via `AsyncWorker` (QThread + asyncio event loop).
 - **Entrypoint**: `main.py` — loads `.env`, applies dark QSS, creates `QApplication + MainWindow`.
 
 ```
-main.py → MainWindow → QStackedWidget: [AuthWidget | ChannelListWidget]
+main.py → MainWindow → QStackedWidget: [AuthWidget | QTabWidget]
+                │   ├── 📺 Каналы (ChannelListWidget, dialog_type="channel")
+                │   ├── 👥 Чаты   (ChannelListWidget, dialog_type="supergroup,group")
+                │   ├── 🤖 Боты   (ChannelListWidget, dialog_type="bot")
+                │   └── 🗑 Удалённые (ChannelListWidget, dialog_type="deleted")
                 └── AsyncWorker (QThread) ── TelegramClientWrapper (Telethon)
 ```
+
+## Dialog types — 6 types
+`Channel.dialog_type` is a string field. Constants in `app/models/channel.py`:
+
+| Constant | Value | Telethon entity |
+|---|---|---|
+| `DIALOG_CHANNEL` | `"channel"` | `Channel.broadcast=True` |
+| `DIALOG_SUPERGROUP` | `"supergroup"` | `Channel.megagroup=True` |
+| `DIALOG_GROUP` | `"group"` | `Chat` |
+| `DIALOG_BOT` | `"bot"` | `User.bot=True` |
+| `DIALOG_USER` | `"user"` | `User` (regular) |
+| `DIALOG_DELETED` | `"deleted"` | `User.deleted=True` |
+
+## get_all_dialogs() vs get_all_channels()
+`get_all_dialogs()` calls `client.get_dialogs(limit=None)` and classifies every entity by type. It replaces the old `get_all_channels()` which only returned broadcast channels. The legacy `get_all_channels()` is kept as a wrapper that filters to `dialog_type="channel"`.
+
+## leave_dialog() dispatcher
+`leave_dialog(channel)` routes to the correct Telethon method based on `dialog_type`:
+- `channel` / `supergroup` → `LeaveChannelRequest`
+- `group` → `DeleteChatUserRequest(chat_id, user_id='self')`
+- `user` / `bot` / `deleted` → `client.delete_dialog()`
 
 ## API keys — priority
 1. `os.getenv("TELEGRAM_API_ID")` — from `.env` (dev) or CI env (test jobs)
@@ -39,6 +65,12 @@ When the server returns `LoginTokenSuccess` (already authorized; session is stil
 ## Stale-task cancellation
 `_restart_auth()` cancels any in-flight `load_channels` future before calling `reset_session()`. Without this, a flood-waiting `get_dialogs()` would resume on the new `TelegramClient` before `connect()` finishes. `_on_channels_loaded` also checks `auth_state` as a guard.
 
+## Tab distribution
+After `get_all_dialogs()` returns, `_distribute_channels()` in MainWindow splits the list by `dialog_type` into 4 `ChannelListWidget` instances — one per tab. Each tab has independent selection, search, and filter state.
+
+## Deleted-account cleanup
+The 🗑 Удалённые tab shows dialogs where `dialog_type="deleted"`. The action button changes to "Удалить выбранные" and calls `client.delete_dialog()` instead of `LeaveChannelRequest`. The confirmation dialog and completion message differ from the leave flow.
+
 ## Async worker pattern
 Use `_run_async(coro, on_result=fn, on_error=fn)` from MainWindow. Both callbacks always run on the Qt main thread. Never call GUI methods from the worker thread directly.
 
@@ -49,8 +81,8 @@ Use `_run_async(coro, on_result=fn, on_error=fn)` from MainWindow. Both callback
 
 ## Tests
 - **Only business logic** (`ChannelManager`, `Channel` model). No GUI tests.
-- `conftest.py` provides `FakeTelegramClient` (mock, no real Telethon), `sample_channels` (6 fixtures), and `manager` fixture wired to `FakeTelegramClient`.
-- All 16 tests run offline, no Telegram connection needed.
+- `conftest.py` provides `FakeTelegramClient` (mock with `leave_dialog`, `delete_dialog`), `sample_channels` (10 fixtures including all 6 dialog types), and `manager` fixture wired to `FakeTelegramClient`.
+- All 17 tests run offline, no Telegram connection needed.
 - Run: `pytest -v --tb=short`
 
 ## PyInstaller build

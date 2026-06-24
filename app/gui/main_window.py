@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QStackedWidget,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -35,6 +36,7 @@ from app.core.telegram_client import TelegramClientWrapper
 from app.core.channel_manager import ChannelManager, LeaveProgressCallback
 from app.gui.auth_widget import AuthWidget
 from app.gui.channel_list import ChannelListWidget
+from app.models.channel import DIALOG_BOT, DIALOG_CHANNEL, DIALOG_DELETED, DIALOG_GROUP, DIALOG_SUPERGROUP, DIALOG_USER
 from app.services.async_worker import AsyncWorker
 from app.services.session_service import load_config, save_config
 
@@ -64,6 +66,7 @@ class MainWindow(QMainWindow):
         self._settings = load_config()
         self._leave_running = False
         self._load_channels_future = None
+        self._dialog_list_widgets: dict[str, ChannelListWidget] = {}
 
         self._build_ui()
         self._build_menu()
@@ -114,7 +117,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self._status_label)
 
     def _build_channel_page(self) -> QWidget:
-        """Build the channel-list page with controls and progress area."""
+        """Build the channel-list page with tabs and controls."""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(16, 8, 16, 8)
@@ -122,7 +125,7 @@ class MainWindow(QMainWindow):
 
         # Top bar: title + refresh
         top_bar = QHBoxLayout()
-        title = QLabel("Мои каналы")
+        title = QLabel("Мои диалоги")
         title.setObjectName("titleLabel")
         top_bar.addWidget(title)
 
@@ -135,26 +138,40 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(top_bar)
 
-        # Channel list
-        self._channel_list = ChannelListWidget()
-        self._channel_list.selection_changed.connect(self._on_selection_changed)
-        self._channel_list.leave_requested.connect(self._on_leave_requested)
-        layout.addWidget(self._channel_list, 1)
+        # Tab widget with per-type lists
+        self._tab_widget = QTabWidget()
+
+        self._tab_defs: list[tuple[str, str]] = [
+            (DIALOG_CHANNEL, "📺 Каналы"),
+            (DIALOG_SUPERGROUP, "👥 Чаты"),
+            (DIALOG_BOT, "🤖 Боты"),
+            (DIALOG_DELETED, "🗑 Удалённые"),
+        ]
+
+        self._tab_index_map: dict[int, str] = {}
+        for i, (dtype, label) in enumerate(self._tab_defs):
+            w = ChannelListWidget(dialog_type=dtype)
+            w.selection_changed.connect(self._on_selection_changed)
+            w.leave_requested.connect(self._on_leave_requested)
+            self._tab_widget.addTab(w, label)
+            self._dialog_list_widgets[dtype] = w
+            self._tab_index_map[i] = dtype
+
+        self._tab_widget.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self._tab_widget, 1)
 
         # Bottom controls
         controls = QHBoxLayout()
         controls.setSpacing(8)
 
-        # Leave button
-        self._leave_btn = QPushButton("🚪 Выйти из выбранных")
-        self._leave_btn.setObjectName("dangerButton")
-        self._leave_btn.setEnabled(False)
-        self._leave_btn.clicked.connect(self._confirm_and_leave)
-        controls.addWidget(self._leave_btn)
+        self._action_btn = QPushButton("🚪 Выйти из выбранных")
+        self._action_btn.setObjectName("dangerButton")
+        self._action_btn.setEnabled(False)
+        self._action_btn.clicked.connect(self._confirm_and_leave)
+        controls.addWidget(self._action_btn)
 
         controls.addStretch()
 
-        # Theme toggle
         self._theme_btn = QPushButton("🌙 Тёмная тема")
         self._theme_btn.setObjectName("secondaryButton")
         self._theme_btn.clicked.connect(self._toggle_theme)
@@ -177,7 +194,6 @@ class MainWindow(QMainWindow):
         self._progress_label.setObjectName("statusLabel")
         progress_layout.addWidget(self._progress_label)
 
-        # Stop button
         stop_btn_layout = QHBoxLayout()
         stop_btn_layout.addStretch()
         self._stop_btn = QPushButton("⏹ Стоп")
@@ -186,7 +202,6 @@ class MainWindow(QMainWindow):
         stop_btn_layout.addWidget(self._stop_btn)
         progress_layout.addLayout(stop_btn_layout)
 
-        # Log area
         self._log_area = QTextEdit()
         self._log_area.setReadOnly(True)
         self._log_area.setMaximumHeight(120)
@@ -305,17 +320,21 @@ class MainWindow(QMainWindow):
         )
 
     def _on_channels_loaded(self, channels) -> None:
-        """Called on the main thread with loaded channels."""
-        # Guard: user might have restarted auth while load was in-flight
+        """Called on the main thread with loaded dialogs."""
         if self._client.auth_state.name != "AUTHENTICATED":
             logger.debug("Skipping _on_channels_loaded — no longer authenticated")
             return
         if not channels:
-            self._status_label.setText("Нет доступных каналов")
+            self._status_label.setText("Нет доступных диалогов")
             return
-        self._channel_list.set_channels(channels)
+        self._distribute_channels(channels)
         self._stack.setCurrentIndex(1)
-        self._status_label.setText(f"Загружено {len(channels)} каналов")
+        total = len(channels)
+        counts = ", ".join(
+            f"{l}: {len([c for c in channels if c.dialog_type == t])}"
+            for t, l in self._tab_defs
+        )
+        self._status_label.setText(f"Загружено {total} диалогов ({counts})")
 
     @Slot()
     def _on_refresh(self) -> None:
@@ -332,9 +351,31 @@ class MainWindow(QMainWindow):
 
     def _on_refresh_complete(self, channels) -> None:
         """Called on main thread after refresh."""
-        self._channel_list.set_channels(channels)
-        self._status_label.setText(f"Загружено {len(channels)} каналов")
+        self._distribute_channels(channels)
+        total = len(channels)
+        self._status_label.setText(f"Загружено {total} диалогов")
         self._refresh_btn.setEnabled(True)
+
+    def _distribute_channels(self, channels: list) -> None:
+        """Split loaded dialogs into per-type tab widgets."""
+        for dtype, widget in self._dialog_list_widgets.items():
+            filtered = [c for c in channels if c.dialog_type == dtype]
+            widget.set_channels(filtered)
+
+    # ------------------------------------------------------------------
+    # Tab switching
+    # ------------------------------------------------------------------
+
+    @Slot(int)
+    def _on_tab_changed(self, index: int) -> None:
+        dtype = self._tab_index_map.get(index, DIALOG_CHANNEL)
+        count = self._dialog_list_widgets[dtype].total_count()
+        left = self._dialog_list_widgets[dtype].left_count()
+        if dtype == DIALOG_DELETED:
+            self._action_btn.setText("🗑 Удалить выбранные")
+        else:
+            self._action_btn.setText("🚪 Выйти из выбранных")
+        self._action_btn.setEnabled(False)
 
     # ------------------------------------------------------------------
     # Selection
@@ -342,20 +383,25 @@ class MainWindow(QMainWindow):
 
     @Slot(object)
     def _on_selection_changed(self, count: int) -> None:
-        self._leave_btn.setEnabled(count > 0)
-        if count > 0:
-            self._leave_btn.setText(f"🚪 Выйти из {count} каналов")
+        self._action_btn.setEnabled(count > 0)
+        dtype = self._active_dialog_type()
+        if dtype == DIALOG_DELETED:
+            self._action_btn.setText(f"🗑 Удалить {count} чатов" if count > 0 else "🗑 Удалить выбранные")
         else:
-            self._leave_btn.setText("🚪 Выйти из выбранных")
+            self._action_btn.setText(f"🚪 Выйти из {count}" if count > 0 else "🚪 Выйти из выбранных")
+
+    def _active_dialog_type(self) -> str:
+        idx = self._tab_widget.currentIndex()
+        return self._tab_index_map.get(idx, DIALOG_CHANNEL)
+
+    def _active_list_widget(self) -> ChannelListWidget:
+        dtype = self._active_dialog_type()
+        return self._dialog_list_widgets[dtype]
 
     @Slot(list)
     def _on_leave_requested(self, channel_ids: list) -> None:
-        """Handle leave_requested signal from channel list.
-
-        The signal carries channel IDs; we convert back to Channel
-        objects and start the confirm/leave workflow.
-        """
-        channels = self._channel_list.get_selected_channels()
+        """Handle leave_requested signal from channel list."""
+        channels = self._active_list_widget().get_selected_channels()
         if channels:
             self._confirm_and_leave()
 
@@ -365,31 +411,47 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def _confirm_and_leave(self) -> None:
-        """Show confirmation dialog, then start bulk leave."""
-        channels = self._channel_list.get_selected_channels()
+        """Show confirmation dialog, then start bulk leave or delete."""
+        widget = self._active_list_widget()
+        channels = widget.get_selected_channels()
         if not channels:
             return
 
+        dtype = self._active_dialog_type()
         count = len(channels)
-        reply = QMessageBox.question(
-            self,
-            "Подтверждение выхода",
-            f"Вы уверены, что хотите выйти из {count} каналов?\n\n"
-            "Это действие нельзя отменить. Вы будете удалены из этих каналов.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No,
-        )
 
-        if reply != QMessageBox.Yes:
-            return
-
-        self._start_bulk_leave(channels)
+        if dtype == DIALOG_DELETED:
+            reply = QMessageBox.question(
+                self,
+                "Подтверждение удаления",
+                f"Удалить {count} чатов с удалёнными аккаунтами?\n\n"
+                "Диалоги будут удалены из вашего списка чатов.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+            self._start_bulk_delete(channels)
+        else:
+            label = "каналов" if dtype == DIALOG_CHANNEL else "чатов" if dtype in (DIALOG_SUPERGROUP, DIALOG_GROUP) else "диалогов"
+            reply = QMessageBox.question(
+                self,
+                "Подтверждение выхода",
+                f"Вы уверены, что хотите выйти из {count} {label}?\n\n"
+                "Это действие нельзя отменить.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+            self._start_bulk_leave(channels)
 
     def _start_bulk_leave(self, channels) -> None:
         """Initiate the bulk-leave workflow."""
+        widget = self._active_list_widget()
         self._leave_running = True
-        self._leave_btn.setEnabled(False)
-        self._channel_list.setEnabled(False)
+        self._action_btn.setEnabled(False)
+        widget.setEnabled(False)
         self._refresh_btn.setEnabled(False)
 
         # Show progress area
@@ -399,11 +461,35 @@ class MainWindow(QMainWindow):
         self._log_area.clear()
         self._stop_btn.setEnabled(True)
 
-        # Wrap Qt callbacks so they run on the main thread via the worker's
-        # signal dispatch (Qt.QueuedConnection).
         callbacks = LeaveProgressCallback(
             on_progress=self._wrap_qt_callback(self._update_progress),
             on_channel_done=self._wrap_qt_callback(self._log_channel_result),
+            on_complete=self._wrap_qt_callback(self._on_leave_complete),
+            on_stop=lambda: not self._leave_running,
+        )
+
+        self._run_async(
+            self._channel_manager.bulk_leave(channels, callbacks),
+            on_error=lambda exc: self._on_leave_error(exc),
+        )
+
+    def _start_bulk_delete(self, channels) -> None:
+        """Delete selected dialogs (deleted-account chats)."""
+        widget = self._active_list_widget()
+        self._leave_running = True
+        self._action_btn.setEnabled(False)
+        widget.setEnabled(False)
+        self._refresh_btn.setEnabled(False)
+
+        self._progress_widget.setVisible(True)
+        self._progress_bar.setRange(0, len(channels))
+        self._progress_bar.setValue(0)
+        self._log_area.clear()
+        self._stop_btn.setEnabled(True)
+
+        callbacks = LeaveProgressCallback(
+            on_progress=self._wrap_qt_callback(self._update_progress),
+            on_channel_done=self._wrap_qt_callback(self._log_delete_result),
             on_complete=self._wrap_qt_callback(self._on_leave_complete),
             on_stop=lambda: not self._leave_running,
         )
@@ -426,7 +512,7 @@ class MainWindow(QMainWindow):
         self._progress_label.setText(f"Обрабатывается: {title}  [{current}/{total}]")
 
     def _log_channel_result(self, channel_id: int, title: str, status: str) -> None:
-        """Log the result of leaving one channel (must be called from main thread)."""
+        """Log the result of leaving one dialog (must be called from main thread)."""
         status_map = {
             "success": "✅ Успешно",
             "rate_limited": "⏳ Rate limit",
@@ -437,7 +523,18 @@ class MainWindow(QMainWindow):
         msg = f"{status_map.get(status, status)}: {title}"
         self._log_area.append(msg)
         if status == "success":
-            self._channel_list.mark_channels_left([channel_id])
+            self._active_list_widget().mark_channels_left([channel_id])
+
+    def _log_delete_result(self, channel_id: int, title: str, status: str) -> None:
+        """Log the result of deleting one dialog."""
+        status_map = {
+            "success": "🗑 Удалён",
+            "error": "❌ Ошибка",
+        }
+        msg = f"{status_map.get(status, status)}: {title}"
+        self._log_area.append(msg)
+        if status == "success":
+            self._active_list_widget().mark_channels_left([channel_id])
 
     @Slot()
     def _on_stop_leave(self) -> None:
@@ -448,22 +545,20 @@ class MainWindow(QMainWindow):
         self._log_area.append("⏹ Остановлено пользователем")
 
     def _on_leave_complete(self, success: int, errors: int) -> None:
-        """Called when the bulk-leave operation finishes."""
+        """Called when the bulk-leave/delete operation finishes."""
         self._leave_running = False
         self._stop_btn.setEnabled(False)
         self._progress_label.setText(f"✅ Завершено: {success} успешно, {errors} с ошибками")
 
-        left = self._channel_list.left_count()
-        QMessageBox.information(
-            self,
-            "Выход завершён",
-            f"✅ Успешно: {success}\n"
-            f"❌ С ошибками: {errors}\n\n"
-            "Покинутые каналы отмечены в списке. "
-            "Нажмите «Обновить», чтобы убрать их.",
-        )
+        dtype = self._active_dialog_type()
+        if dtype == DIALOG_DELETED:
+            msg = f"🗑 Удалено: {success}\n❌ Ошибок: {errors}\n\nУдалённые диалоги отмечены в списке."
+        else:
+            msg = f"✅ Успешно: {success}\n❌ С ошибками: {errors}\n\nПокинутые диалоги отмечены в списке. Нажмите «Обновить», чтобы убрать их."
 
-        self._channel_list.setEnabled(True)
+        QMessageBox.information(self, "Операция завершена", msg)
+
+        self._active_list_widget().setEnabled(True)
         self._refresh_btn.setEnabled(True)
 
     def _on_leave_error(self, exc: Exception) -> None:
@@ -471,7 +566,7 @@ class MainWindow(QMainWindow):
         self._leave_running = False
         self._stop_btn.setEnabled(False)
         self._log_area.append(f"❌ Критическая ошибка: {exc}")
-        self._channel_list.setEnabled(True)
+        self._active_list_widget().setEnabled(True)
         self._refresh_btn.setEnabled(True)
         QMessageBox.critical(self, "Ошибка", f"Критическая ошибка: {exc}")
 

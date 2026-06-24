@@ -9,6 +9,7 @@ from pytest import fixture
 
 from app.core.telegram_client import LeaveResult
 from app.models.channel import Channel
+from app.models.channel import DIALOG_BOT, DIALOG_CHANNEL, DIALOG_DELETED, DIALOG_GROUP, DIALOG_SUPERGROUP
 from app.core.channel_manager import ChannelManager
 
 
@@ -16,12 +17,17 @@ from app.core.channel_manager import ChannelManager
 def sample_channels() -> list[Channel]:
     """Return a list of fake channel objects for testing."""
     return [
-        Channel(id=-1001, title="Tech News", username="technews", participant_count=15000, unread_count=3),
-        Channel(id=-1002, title="Cooking Recipes", username=None, participant_count=500, unread_count=0),
-        Channel(id=-1003, title="Abandoned Channel", username="dead", participant_count=15, unread_count=0),
-        Channel(id=-1004, title="Python Developers", username="pythondev", participant_count=4200, unread_count=12),
-        Channel(id=-1005, title="Music Lovers", username="music", participant_count=80, unread_count=1),
-        Channel(id=-1006, title="Empty Channel", username=None, participant_count=0, unread_count=0),
+        Channel(id=-1001, title="Tech News", username="technews", participant_count=15000, unread_count=3, dialog_type=DIALOG_CHANNEL),
+        Channel(id=-1002, title="Cooking Recipes", username=None, participant_count=500, unread_count=0, dialog_type=DIALOG_CHANNEL),
+        Channel(id=-1003, title="Abandoned Channel", username="dead", participant_count=15, unread_count=0, dialog_type=DIALOG_CHANNEL),
+        Channel(id=-1004, title="Python Developers", username="pythondev", participant_count=4200, unread_count=12, dialog_type=DIALOG_CHANNEL),
+        Channel(id=-1005, title="Music Lovers", username="music", participant_count=80, unread_count=1, dialog_type=DIALOG_CHANNEL),
+        Channel(id=-1006, title="Empty Channel", username=None, participant_count=0, unread_count=0, dialog_type=DIALOG_CHANNEL),
+        # New types for multi-dialog support
+        Channel(id=-2001, title="Dev Chat", username="devchat", participant_count=120, unread_count=5, is_channel=False, dialog_type=DIALOG_SUPERGROUP),
+        Channel(id=-2002, title="Old Group", username=None, participant_count=8, unread_count=0, is_channel=False, dialog_type=DIALOG_GROUP),
+        Channel(id=-3001, title="Test Bot", username="testbot", participant_count=0, unread_count=2, is_channel=False, dialog_type=DIALOG_BOT),
+        Channel(id=-4001, title="Deleted User", username=None, participant_count=0, unread_count=0, is_channel=False, is_joined=False, dialog_type=DIALOG_DELETED),
     ]
 
 
@@ -38,8 +44,14 @@ class FakeTelegramClient:
     def set_leave_result(self, channel_id: int, result) -> None:
         self._leave_results[channel_id] = result
 
+    async def leave_dialog(self, channel: Channel) -> LeaveResult:
+        return self._leave_results.get(channel.id, LeaveResult.SUCCESS)
+
     async def leave_channel(self, channel_id: int) -> LeaveResult:
         return self._leave_results.get(channel_id, LeaveResult.SUCCESS)
+
+    async def delete_dialog(self, dialog_id: int) -> LeaveResult:
+        return self._leave_results.get(dialog_id, LeaveResult.SUCCESS)
 
 
 @fixture
