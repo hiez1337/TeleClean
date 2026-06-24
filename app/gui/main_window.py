@@ -63,6 +63,7 @@ class MainWindow(QMainWindow):
         # --- State ---
         self._settings = load_config()
         self._leave_running = False
+        self._load_channels_future = None
 
         self._build_ui()
         self._build_menu()
@@ -280,7 +281,8 @@ class MainWindow(QMainWindow):
     def _on_authenticated(self) -> None:
         """User has authenticated — switch to channel list."""
         self._status_label.setText("Авторизация успешна. Загружаю каналы...")
-        self._run_async(
+        # Store reference so _restart_auth can cancel it
+        self._load_channels_future = self._run_async(
             self._load_channels_async(),
             on_result=self._on_channels_loaded,
             on_error=lambda exc: self._status_label.setText(
@@ -304,6 +306,10 @@ class MainWindow(QMainWindow):
 
     def _on_channels_loaded(self, channels) -> None:
         """Called on the main thread with loaded channels."""
+        # Guard: user might have restarted auth while load was in-flight
+        if self._client.auth_state.name != "AUTHENTICATED":
+            logger.debug("Skipping _on_channels_loaded — no longer authenticated")
+            return
         if not channels:
             self._status_label.setText("Нет доступных каналов")
             return
@@ -316,7 +322,7 @@ class MainWindow(QMainWindow):
         """Refresh the channel list from Telegram."""
         self._refresh_btn.setEnabled(False)
         self._status_label.setText("Обновление списка каналов...")
-        self._run_async(
+        self._load_channels_future = self._run_async(
             self._channel_manager.load_channels(force_refresh=True),
             on_result=self._on_refresh_complete,
             on_error=lambda exc: self._status_label.setText(
@@ -522,9 +528,14 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
+        # Cancel any in-flight channel load (may be flood-waiting)
+        if self._load_channels_future is not None:
+            self._load_channels_future.cancel()
+            self._load_channels_future = None
+
         self._status_label.setText("Отключаюсь от Telegram...")
 
-        # Reset session (disconnect + clear auth key in SQLite)
+        # Reset session (log_out + brand-new TelegramClient)
         self._run_async(
             self._client.reset_session(),
             on_result=lambda _: self._on_session_reset(),
