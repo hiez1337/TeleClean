@@ -39,15 +39,15 @@ class TestFiltering:
 
     def test_filter_low_subscribers(self, manager: ChannelManager, sample_channels: list[Channel]) -> None:
         result = manager.filter_low_subscribers(sample_channels, max_count=100)
-        assert len(result) == 2  # Abandoned Channel (15), Music Lovers (80), Empty Channel (0)
+        # Channels with <= 100 subscribers: Abandoned (15), Music Lovers (80), Empty (0)
+        assert len(result) == 3
         for ch in result:
             assert ch.participant_count <= 100
 
     def test_filter_low_subscribers_default(self, manager: ChannelManager, sample_channels: list[Channel]) -> None:
         result = manager.filter_low_subscribers(sample_channels)
-        assert len(result) == 2  # 15 and 80 and 0… actually 3 if we include 0
-        # participant_count ≤ 100: Abandoned (15), Music Lovers (80), Empty (0) = 3
-        assert len(result) >= 2
+        # Default max_count=100: same 3 channels
+        assert len(result) == 3
 
 
 class TestSorting:

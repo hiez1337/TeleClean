@@ -247,26 +247,35 @@ class MainWindow(QMainWindow):
     @Slot()
     def _start_auth(self) -> None:
         """Called shortly after startup to begin auth."""
-        self._run_async(self._start_auth_async())
+        self._run_async(
+            self._client.start_with_session(),
+            callback=self._on_session_check_done,
+            errback=lambda exc: self._auth_widget._show_error(str(exc)),
+        )
 
-    async def _start_auth_async(self) -> None:
-        """Async: try to restore a session, else show QR code."""
-        try:
-            restored = await self._client.start_with_session()
-            if restored:
-                self._on_authenticated()
-            else:
-                # Show the QR code auth flow
-                await self._auth_widget.start_auth_flow()
-        except Exception as exc:
-            logger.exception("Auth start failed")
-            self._auth_widget._show_error(str(exc))
+    def _on_session_check_done(self, restored: bool) -> None:
+        """Called after checking for an existing session."""
+        if restored:
+            self._on_authenticated()
+        else:
+            # Start QR auth: connect first, then begin flow
+            self._run_async(
+                self._client.connect(),
+                callback=lambda _: self._auth_widget._start_qr_flow(),
+                errback=lambda exc: self._auth_widget._show_error(str(exc)),
+            )
 
     @Slot()
     def _on_authenticated(self) -> None:
         """User has authenticated — switch to channel list."""
         self._status_label.setText("Авторизация успешна. Загружаю каналы...")
-        self._run_async(self._load_channels_async())
+        self._run_async(
+            self._load_channels_async(),
+            callback=self._on_channels_loaded,
+            errback=lambda exc: self._status_label.setText(
+                f"Ошибка загрузки каналов: {exc}"
+            ),
+        )
 
     @Slot()
     def _on_worker_error(self, message: str) -> None:
@@ -276,23 +285,20 @@ class MainWindow(QMainWindow):
     # Channel loading
     # ------------------------------------------------------------------
 
-    async def _load_channels_async(self) -> None:
-        """Async: fetch channels and switch to the channel page."""
-        try:
-            channels = await self._channel_manager.load_channels(
-                force_refresh=True,
-                on_progress=lambda current, total: self._status_label.setText(
-                    f"Загрузка каналов: {current}/{total}"
-                ),
-            )
-            self._channel_list.set_channels(channels)
-            self._stack.setCurrentIndex(1)
-            self._status_label.setText(
-                f"Загружено {len(channels)} каналов"
-            )
-        except Exception as exc:
-            logger.exception("Channel load failed")
-            self._status_label.setText(f"Ошибка загрузки каналов: {exc}")
+    async def _load_channels_async(self) -> list:
+        """Async: fetch channels and return them (no GUI calls)."""
+        return await self._channel_manager.load_channels(
+            force_refresh=True,
+        )
+
+    def _on_channels_loaded(self, channels) -> None:
+        """Called on the main thread with loaded channels."""
+        if not channels:
+            self._status_label.setText("Нет доступных каналов")
+            return
+        self._channel_list.set_channels(channels)
+        self._stack.setCurrentIndex(1)
+        self._status_label.setText(f"Загружено {len(channels)} каналов")
 
     @Slot()
     def _on_refresh(self) -> None:
@@ -300,19 +306,15 @@ class MainWindow(QMainWindow):
         self._refresh_btn.setEnabled(False)
         self._status_label.setText("Обновление списка каналов...")
         self._run_async(
-            self._channel_manager.load_channels(
-                force_refresh=True,
-                on_progress=lambda cur, tot: self._status_label.setText(
-                    f"Обновление: {cur}/{tot}"
-                ),
-            ),
-            callback=lambda channels: self._on_channels_loaded(channels),
+            self._channel_manager.load_channels(force_refresh=True),
+            callback=self._on_refresh_complete,
             errback=lambda exc: self._status_label.setText(
                 f"Ошибка обновления: {exc}"
             ),
         )
 
-    def _on_channels_loaded(self, channels) -> None:
+    def _on_refresh_complete(self, channels) -> None:
+        """Called on main thread after refresh."""
         self._channel_list.set_channels(channels)
         self._status_label.setText(f"Загружено {len(channels)} каналов")
         self._refresh_btn.setEnabled(True)

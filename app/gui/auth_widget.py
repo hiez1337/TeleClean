@@ -227,32 +227,28 @@ class AuthWidget(QWidget):
     # Public API
     # ------------------------------------------------------------------
 
-    async def start_auth_flow(self) -> None:
-        """Begin the authorisation flow.
+    def _start_qr_flow(self) -> None:
+        """Begin QR-code authorisation (must be called from Qt main thread).
 
-        Called from the async worker (already inside the event loop).
-        Shows the QR code and starts periodic refresh/poll.
+        Sets up timers for QR refresh and scan-polling, then generates
+        the first QR code via the async worker.
         """
-        try:
-            await self._update_qr()
+        # Initial QR generation — async part runs on worker, callback
+        # handles GUI update on main thread.
+        self._generate_qr(on_error=lambda msg: self._qr_status.setText(msg))
 
-            # QTimer for QR refresh (30 s) — fires on Qt main thread
-            self._qr_refresh_timer = QTimer(self)
-            self._qr_refresh_timer.timeout.connect(self._on_qr_refresh)
-            self._qr_refresh_timer.start(QR_REFRESH_INTERVAL_S * 1000)
+        # QTimer for QR refresh (30 s) — fires on Qt main thread
+        self._qr_refresh_timer = QTimer(self)
+        self._qr_refresh_timer.timeout.connect(self._on_qr_refresh)
+        self._qr_refresh_timer.start(QR_REFRESH_INTERVAL_S * 1000)
 
-            # QTimer for polling QR scan — every 2 s on Qt main thread
-            self._qr_poll_timer = QTimer(self)
-            self._qr_poll_timer.timeout.connect(self._on_poll_qr)
-            self._qr_poll_timer.start(QR_POLL_INTERVAL_S * 1000)
+        # QTimer for polling QR scan — every 2 s on Qt main thread
+        self._qr_poll_timer = QTimer(self)
+        self._qr_poll_timer.timeout.connect(self._on_poll_qr)
+        self._qr_poll_timer.start(QR_POLL_INTERVAL_S * 1000)
 
-        except Exception as exc:
-            logger.exception("QR flow start error")
-            self._qr_error.setText(str(exc))
-            self._qr_error.setVisible(True)
-
-    async def stop_auth_flow(self) -> None:
-        """Stop all auth-related timers."""
+    def stop_auth_flow(self) -> None:
+        """Stop all auth-related timers (call from main thread)."""
         if self._qr_refresh_timer:
             self._qr_refresh_timer.stop()
         if self._qr_poll_timer:
@@ -262,14 +258,20 @@ class AuthWidget(QWidget):
     # QR flow
     # ------------------------------------------------------------------
 
-    async def _update_qr(self) -> None:
-        """Generate a fresh QR code and display it."""
-        token = await self._client.get_qr_token()
-        if token is None:
-            self._qr_status.setText("Ошибка генерации QR-кода")
-            return
+    def _generate_qr(self, on_error=None):
+        """Schedule a QR-code generation on the async worker.
 
-        # Convert PIL Image → QPixmap (can be done in either thread)
+        Callback handles GUI updates on the main thread.
+        """
+        self._run_async(
+            self._client.get_qr_token(),
+            on_result=lambda token: self._display_qr(token) if token else (
+                on_error("Ошибка генерации QR-кода") if on_error else None
+            ),
+        )
+
+    def _display_qr(self, token: bytes) -> None:
+        """Convert token bytes to a QR image and display it (main thread)."""
         qr_img: PILImage = qrcode.make(token, box_size=6)
         buffer = io.BytesIO()
         qr_img.save(buffer, format="PNG")
@@ -284,21 +286,7 @@ class AuthWidget(QWidget):
     @Slot()
     def _on_qr_refresh(self) -> None:
         """QTimer slot: refresh the QR code image."""
-        # Schedule on the async worker; GUI updates happen inside _update_qr
-        # which runs on the worker, BUT setPixmap/setText must be on main
-        # thread.  We use _run_async which delivers callbacks on main
-        # thread, but _update_qr itself sets GUI elements.
-        #
-        # Workaround: use a plain lambda to schedule the coro and let
-        # Qt handle the GUI updates in the timer slot (main thread).
-        # Since _update_qr is async, we need to bridge.  Simpler: just
-        # set the GUI directly from a non-async refresh that generates
-        # a QR token synchronously.
-        #
-        # Best approach: schedule _update_qr on the worker.  The widget
-        # methods setPixmap / setText are cross-thread-safe in Qt
-        # (they post to the main thread).  So this is fine:
-        self._run_async(self._update_qr())
+        self._generate_qr(on_error=lambda msg: self._qr_status.setText(msg))
 
     @Slot()
     def _on_poll_qr(self) -> None:
