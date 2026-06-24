@@ -206,13 +206,10 @@ class TelegramClientWrapper:
         """
         for attempt in range(2):
             try:
-                if self.client.session.auth_key:
-                    logger.warning("auth_key still present, resetting session")
-                    await self.reset_session()
                 if not self.client.is_connected():
                     await self.client.connect()
                 self._qr_login = await self.client.qr_login()
-                self._last_qr_token = self._qr_login.token
+                self._last_qr_token = self._qr_login.url
                 self.auth_state = AuthState.WAITING_FOR_QR_SCAN
                 self.last_error = ""
                 return self._qr_login.url
@@ -220,7 +217,16 @@ class TelegramClientWrapper:
                 self.last_error = f"AuthRestartError (attempt {attempt+1}): {exc}"
                 logger.warning(self.last_error)
                 await self.reset_session()
-                await self.client.connect()
+            except errors.SessionPasswordNeededError:
+                self.last_error = "2FA required"
+                self.auth_state = AuthState.WAITING_FOR_CODE
+                raise
+            except AttributeError as exc:
+                self.last_error = f"LoginTokenSuccess (already authorized): {exc}"
+                logger.warning(self.last_error)
+                self.auth_state = AuthState.AUTHENTICATED
+                self.last_error = ""
+                return "LOGIN_SUCCESS"
             except Exception as exc:
                 self.last_error = f"{type(exc).__name__}: {exc}"
                 logger.error("QR login error: %s", self.last_error)
