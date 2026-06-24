@@ -125,24 +125,26 @@ class TelegramClientWrapper:
         self.auth_state = AuthState.NOT_AUTHENTICATED
 
     async def reset_session(self) -> None:
-        """Disconnect and destroy session data for fresh authorization.
+        """Log out from Telegram server and destroy session data.
 
-        Closes the SQLite session file, deletes it (and journal/WAL files)
-        from disk, and creates a fresh empty session.  On the next
-        ``start_with_session()`` the client will require QR / phone login
-        because no auth data exists.
+        1. Calls ``client.log_out()`` so the server invalidates the auth key
+        2. Deletes stale session files from disk (handles Windows locks)
+        3. Creates a fresh empty SQLiteSession for a clean QR login
+
+        On the next ``start_with_session()`` the client will require QR /
+        phone login because no auth data exists.
         """
-        await self.client.disconnect()
-
-        self.client.session.set_dc(0, "", 0)
+        # 1. Tell the server to invalidate this session (best-effort)
         try:
-            self.client.session.close()
+            await self.client.log_out()
+            logger.info("log_out() completed — server session invalidated")
         except Exception as exc:
-            logger.warning("Error closing session: %s", exc)
+            logger.warning("log_out() failed (ok if already stale): %s", exc)
+            await self.client.disconnect()
 
+        # 2. Nuke any leftover session files (Windows may hold locks)
         session_base = get_session_path()
-        for suffix in (".session", ".session-journal", ".session-wal", ".session-shm",
-                       ".session-journal-wal", ".session-journal-shm"):
+        for suffix in (".session", ".session-journal", ".session-wal", ".session-shm"):
             f = session_base + suffix
             for _ in range(3):
                 try:
@@ -151,12 +153,12 @@ class TelegramClientWrapper:
                         logger.info("Deleted %s", f)
                     break
                 except PermissionError:
-                    import asyncio
                     await asyncio.sleep(0.1)
                 except Exception as exc:
-                    logger.error("Failed to delete %s: %s", f, exc)
+                    logger.warning("Failed to delete %s: %s", f, exc)
                     break
 
+        # 3. Create fresh session (log_out sets session=None)
         try:
             self.client.session = SQLiteSession(self._session_path)
             logger.info("Created fresh empty SQLiteSession")
@@ -164,7 +166,6 @@ class TelegramClientWrapper:
             logger.error("Failed to create fresh session: %s", exc)
 
         self.client._authorized = False
-        self.client.session._dc_id = None
         self.auth_state = AuthState.NOT_AUTHENTICATED
         self._qr_login = None
         self._last_qr_token = None

@@ -34,7 +34,7 @@ from app.core.telegram_client import TelegramClientWrapper
 
 logger = logging.getLogger(__name__)
 
-QR_REFRESH_INTERVAL_S = 30
+QR_REFRESH_INTERVAL_S = 10
 
 
 class AuthWidget(QWidget):
