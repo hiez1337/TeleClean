@@ -1,27 +1,43 @@
 # TeleClean
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![PySide6](https://img.shields.io/badge/PySide6-6.5%2B-green)
-![Telethon](https://img.shields.io/badge/Telethon-1.34%2B-purple)
-![License](https://img.shields.io/badge/license-MIT-yellow)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![PySide6](https://img.shields.io/badge/PySide6-6.11-green)
+![Telethon](https://img.shields.io/badge/Telethon-1.44-purple)
+![CI](https://github.com/hiez1337/TeleClean/actions/workflows/ci.yml/badge.svg)
+[![Latest Release](https://img.shields.io/github/v/release/hiez1337/TeleClean)](https://github.com/hiez1337/TeleClean/releases/latest)
 
-**TeleClean** — десктопное приложение для массового выхода из Telegram-каналов с современным интерфейсом, стилизованным под Telegram Desktop.
+**TeleClean** — десктопное приложение для массового выхода из Telegram-каналов.  
+Стилизовано под Telegram Desktop. Работает "из коробки" — никаких ключей, .env и Python.
+
+![Скриншот](https://via.placeholder.com/800x500?text=TeleClean+screenshot)
+
+## Скачать
+
+👉 [**Latest Release**](https://github.com/hiez1337/TeleClean/releases/latest) — `TeleClean.exe` (~78 MB)
 
 ## Возможности
 
-- **Авторизация** — QR-код (основной) или номер телефона + код из SMS (запасной), поддержка 2FA
-- **Загрузка каналов** — получает список всех каналов, где вы состоите + аватарки
-- **Поиск и фильтрация** — по названию, непрочитанным, подписчикам
-- **Сортировка** — по названию, активности, подписчикам
-- **Массовый выход** — выбор нескольких каналов, прогресс-бар, лог, кнопка Стоп
-- **Dark / Light темы** — точные цвета из официального Telegram UI дизайна (tgui)
-- **Круглые аватарки** — реальные фото каналов из Telegram, кешируются локально
+- ✅ **Авторизация** — QR-код, номер телефона + SMS, 2FA
+- ✅ **Список каналов** — все каналы, реальные аватарки из Telegram
+- ✅ **Поиск / фильтр / сортировка** — по названию, активности, подписчикам
+- ✅ **Массовый выход** — выберите несколько каналов, прогресс-бар, кнопка Стоп
+- ✅ **Темы** — Dark и Light, цвета из официального Telegram UI (tgui)
+- ✅ **API-ключи встроены** — `.exe` работает сразу после скачивания
+- ✅ **Настройки API** — если ключи не работают, можно ввести свои в интерфейсе
 
-## Скриншоты
+## Как использовать
 
-*(добавьте скриншот приложения)*
+1. Скачайте `TeleClean.exe` из [последнего релиза](https://github.com/hiez1337/TeleClean/releases/latest)
+2. Запустите — откроется окно с QR-кодом
+3. Отсканируйте QR в Telegram (Настройки → Устройства)
+4. После авторизации загрузится список каналов
+5. Выберите каналы → нажмите **"Выйти из выбранных"**
 
-## Быстрый старт
+## Если QR-код не появляется
+
+Откройте **Настройки → API ключи Telegram**, получите свои ключи на [my.telegram.org/apps](https://my.telegram.org/apps) и введите их. Затем перезапустите приложение.
+
+## Сборка из исходников
 
 ```bash
 git clone https://github.com/hiez1337/TeleClean.git
@@ -30,15 +46,13 @@ pip install -r requirements.txt
 python main.py
 ```
 
-При первом запуске — отсканируйте QR-код в Telegram (Настройки → Устройства → Привязать устройство).
-
-## Сборка .exe
+Для сборки `.exe`:
 
 ```bash
 .\build_exe.bat
 ```
 
-Готовый файл: `dist\TeleClean.exe` (78 MB). Пользователю не нужен Python или `.env` — ключи API встроены.
+Готовый файл: `dist\TeleClean.exe`.
 
 ## Технологии
 
@@ -46,7 +60,7 @@ python main.py
 |---|---|
 | GUI | PySide6 (Qt 6) |
 | Telegram API | Telethon (async MTProto) |
-| Темизация | QSS (Qt Style Sheets) по токенам @xelene/tgui |
+| Темизация | QSS по токенам @xelene/tgui |
 | Аватарки | QPixmap + QPainter (круглая обрезка) |
 | Сборка | PyInstaller — единый .exe |
 
@@ -54,29 +68,25 @@ python main.py
 
 ```
 TeleClean/
-├── main.py                     # Точка входа
+├── main.py
 ├── app/
 │   ├── core/
-│   │   ├── telegram_client.py  # Telethon обёртка (auth, каналы, выход)
-│   │   ├── channel_manager.py  # Бизнес-логика, кеширование, bulk-leave
-│   │   └── api_keys.py         # API-ключи (только для сборки, в .gitignore)
+│   │   ├── telegram_client.py   # Telethon обёртка
+│   │   └── channel_manager.py   # Бизнес-логика
 │   ├── models/
-│   │   └── channel.py          # Data class канала
+│   │   └── channel.py
 │   ├── services/
-│   │   ├── async_worker.py     # QThread + asyncio bridge
-│   │   └── session_service.py  # Персистентность (config, session, avatar cache)
+│   │   ├── async_worker.py      # QThread + asyncio
+│   │   └── session_service.py   # Config, session, avatars
 │   └── gui/
-│       ├── main_window.py      # Главное окно, bulk-leave workflow
-│       ├── auth_widget.py      # Авторизация (QR, phone, 2FA)
-│       ├── channel_list.py     # Список каналов (QStyledItemDelegate)
+│       ├── main_window.py
+│       ├── auth_widget.py
+│       ├── channel_list.py      # QStyledItemDelegate
 │       └── styles/
 │           ├── telegram_dark.qss
 │           └── telegram_light.qss
 ├── tests/
-│   ├── test_channel_model.py
-│   ├── test_channel_manager.py
-│   └── conftest.py
-└── build_exe.bat               # Сборка .exe через PyInstaller
+└── build_exe.bat
 ```
 
 ## Лицензия
