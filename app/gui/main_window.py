@@ -7,12 +7,17 @@ bulk-leave workflow with progress reporting.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
+
+import sys as _sys
 
 from PySide6.QtCore import QTimer, Slot
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
+    QDialogButtonBox,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -224,6 +229,10 @@ class MainWindow(QMainWindow):
         about_action = QAction("О программе", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
+        help_menu.addSeparator()
+        debug_action = QAction("Информация для отладки", self)
+        debug_action.triggered.connect(self._show_debug)
+        help_menu.addAction(debug_action)
 
     # ------------------------------------------------------------------
     # Async helpers
@@ -536,6 +545,83 @@ class MainWindow(QMainWindow):
             "<p>Использует библиотеку Telethon для работы с Telegram API<br>"
             "и PySide6 для графического интерфейса.</p>",
         )
+
+    # ------------------------------------------------------------------
+    # Debug
+    # ------------------------------------------------------------------
+
+    @Slot()
+    def _show_debug(self) -> None:
+        """Show a debug-info dialog with system state."""
+        lines = []
+        def L(k, v):
+            lines.append(f"{k}: {v}")
+
+        L("--- Application ---", "")
+        L("Mode", "Frozen (.exe)" if getattr(_sys, 'frozen', False) else "Dev (python)")
+        L("Python", _sys.version)
+        L("PySide", "imported")
+
+        L("", "")
+        L("--- API Keys ---", "")
+        api_id_s = os.getenv("TELEGRAM_API_ID")
+        if api_id_s:
+            L("TELEGRAM_API_ID", "set (from .env)")
+        else:
+            try:
+                from app.core.telegram_client import _BUILD_API_ID
+                if _BUILD_API_ID:
+                    L("TELEGRAM_API_ID", f"embedded (keys.json) id={_BUILD_API_ID}")
+                else:
+                    L("TELEGRAM_API_ID", "MISSING (0)")
+            except Exception as e:
+                L("TELEGRAM_API_ID", f"ERROR: {e}")
+
+        L("", "")
+        L("--- Paths ---", "")
+        try:
+            from app.services.session_service import get_data_dir, get_session_path, get_avatar_cache_dir
+            dd = get_data_dir()
+            L("Data dir", str(dd))
+            L("Exists", str(dd.exists()))
+            sp = get_session_path()
+            L("Session path", sp)
+            L("Session exists", str(dd.parent.exists()))
+            av = get_avatar_cache_dir()
+            L("Avatars dir", str(av))
+        except Exception as e:
+            L("Data dir", f"ERROR: {e}")
+
+        L("", "")
+        L("--- Telegram Client ---", "")
+        try:
+            c = self._client
+            L("Client created", "yes")
+            L("Connected", str(c.client.is_connected()))
+            L("Auth state", c.auth_state.value if c.auth_state else "None")
+            L("Has QR login", str(hasattr(c, '_qr_login') and c._qr_login is not None))
+        except Exception as e:
+            L("Client", f"ERROR: {e}")
+
+        L("", "")
+        L("--- Worker ---", "")
+        L("Running", str(self._worker.isRunning()))
+        L("Loop running", str(self._worker.loop.is_running() if self._worker.loop else False))
+
+        text = "\n".join(lines)
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Debug Info")
+        dlg.resize(600, 500)
+        lay = QVBoxLayout(dlg)
+        te = QTextEdit()
+        te.setReadOnly(True)
+        te.setPlainText(text)
+        te.setStyleSheet("font-family: monospace; font-size: 12px; background: #1a1a2e; color: #00ff00;")
+        lay.addWidget(te)
+        bb = QDialogButtonBox(QDialogButtonBox.Ok)
+        bb.accepted.connect(dlg.accept)
+        lay.addWidget(bb)
+        dlg.exec()
 
     # ------------------------------------------------------------------
     # Lifecycle
