@@ -20,7 +20,9 @@ from telethon.tl.types import Channel
 from app.models.channel import Channel as ChannelModel
 from app.services.session_service import get_avatar_path, get_session_path
 
-from app.core.api_keys import API_ID as _EMBEDDED_API_ID, API_HASH as _EMBEDDED_API_HASH
+# CI replaces these placeholders with real keys before building
+_BUILD_API_ID = 0
+_BUILD_API_HASH = ""
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +64,9 @@ class TelegramClientWrapper:
         if api_id_s and api_hash_s:
             self._api_id = int(api_id_s)
             self._api_hash = api_hash_s
-        elif _EMBEDDED_API_ID:
-            self._api_id = _EMBEDDED_API_ID
-            self._api_hash = _EMBEDDED_API_HASH
+        elif _BUILD_API_ID:
+            self._api_id = _BUILD_API_ID
+            self._api_hash = _BUILD_API_HASH
         else:
             raise RuntimeError(
                 "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env"
