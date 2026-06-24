@@ -20,11 +20,7 @@ from telethon.tl.types import Channel
 from app.models.channel import Channel as ChannelModel
 from app.services.session_service import get_avatar_path, get_session_path
 
-try:
-    from app.core.api_keys import API_ID as _EMBEDDED_API_ID, API_HASH as _EMBEDDED_API_HASH
-except ImportError:
-    _EMBEDDED_API_ID = None
-    _EMBEDDED_API_HASH = None
+from app.core.api_keys import API_ID as _EMBEDDED_API_ID, API_HASH as _EMBEDDED_API_HASH
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +62,7 @@ class TelegramClientWrapper:
         if api_id_s and api_hash_s:
             self._api_id = int(api_id_s)
             self._api_hash = api_hash_s
-        elif _EMBEDDED_API_ID is not None and _EMBEDDED_API_HASH is not None:
+        elif _EMBEDDED_API_ID:
             self._api_id = _EMBEDDED_API_ID
             self._api_hash = _EMBEDDED_API_HASH
         else:

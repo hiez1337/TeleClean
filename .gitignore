@@ -1,9 +1,6 @@
 # Environment variables
 .env
 
-# Embedded API keys (build distribution)
-app/core/api_keys.py
-
 # Telethon session files
 *.session
 
