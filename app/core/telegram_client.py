@@ -117,27 +117,48 @@ class TelegramClientWrapper:
 
     async def connect(self) -> None:
         """Connect to Telegram servers."""
+        logger.debug("Connecting to Telegram...")
         await self.client.connect()
+        logger.debug("Connected to %s", self.client.session.dc_id if self.client.session else "?")
 
     async def disconnect(self) -> None:
         """Disconnect from Telegram servers."""
+        logger.debug("Disconnecting from Telegram...")
         await self.client.disconnect()
         self.auth_state = AuthState.NOT_AUTHENTICATED
+        logger.debug("Disconnected")
 
     async def reset_session(self) -> None:
-        """Disconnect and destroy session data for fresh authorization.
+        """Log out from Telegram server and fully reinitialize the client.
 
-        Deletes session files from disk (handles Windows locks) and creates
-        a fresh empty SQLiteSession.  Does NOT call ``log_out()`` (which
-        makes the entire Telethon client unusable).  Relies on the Telegram
-        server to eventually expire the old auth key — the next QR login
-        will use a brand-new auth key.
+        1. Calls ``client.log_out()`` — server invalidates the auth key and
+           the user sees "Terminate this session" on all other clients.
+        2. Deletes stale session files from disk (WAL/journal may remain).
+        3. Creates a **completely new** ``TelegramClient`` instance — the old
+           one is never reused.  Telethon docs: *"client is unusable after
+           logging out and a new instance should be created."*
 
-        On the next ``start_with_session()`` the client will require QR /
-        phone login because no auth data exists.
+        A fresh ``TelegramClient`` has zero stale state: no memory of old
+        channel subscriptions, no corrupted message box, no lingering
+        update-loop tasks.
         """
-        await self.client.disconnect()
+        # 1. Tell the server to invalidate this session
+        try:
+            if self.client.is_connected() and self.client.session and self.client.session.auth_key:
+                await self.client.log_out()
+                logger.info("log_out() — server invalidated the session")
+            else:
+                await self.client.disconnect()
+                logger.info("disconnected (no valid auth key for log_out)")
+        except Exception as exc:
+            logger.warning("log_out failed: %s", exc)
+            try:
+                await self.client.disconnect()
+            except Exception:
+                pass
 
+        # 2. Nuke any leftover session files (log_out deletes .session,
+        #    but WAL/journal may survive on disk)
         session_base = get_session_path()
         for suffix in (".session", ".session-journal", ".session-wal", ".session-shm"):
             f = session_base + suffix
@@ -153,11 +174,16 @@ class TelegramClientWrapper:
                     logger.warning("Failed to delete %s: %s", f, exc)
                     break
 
-        try:
-            self.client.session = SQLiteSession(self._session_path)
-            logger.info("Created fresh empty SQLiteSession")
-        except Exception as exc:
-            logger.error("Failed to create fresh session: %s", exc)
+        # 3. Create brand-new TelegramClient (zero stale state)
+        self.client = TelegramClient(
+            self._session_path,
+            self._api_id,
+            self._api_hash,
+            device_model="TeleClean Desktop",
+            app_version="1.0.0",
+            receive_updates=True,
+        )
+        logger.info("Created brand-new TelegramClient instance")
 
         self.client._authorized = False
         self.auth_state = AuthState.NOT_AUTHENTICATED
@@ -200,14 +226,17 @@ class TelegramClientWrapper:
         Returns the ``tg://login`` URL (string) that should be rendered as
         a QR code, or None on failure.
         """
+        logger.debug("Generating QR login token...")
         for attempt in range(2):
             try:
                 if not self.client.is_connected():
+                    logger.debug("Not connected, connecting...")
                     await self.client.connect()
                 self._qr_login = await self.client.qr_login()
                 self._last_qr_token = self._qr_login.url
                 self.auth_state = AuthState.WAITING_FOR_QR_SCAN
                 self.last_error = ""
+                logger.debug("QR token generated successfully")
                 return self._qr_login.url
             except errors.AuthRestartError as exc:
                 self.last_error = f"AuthRestartError (attempt {attempt+1}): {exc}"
@@ -242,7 +271,15 @@ class TelegramClientWrapper:
             await self._qr_login.recreate()
             self._last_qr_token = self._qr_login.token
             self.auth_state = AuthState.WAITING_FOR_QR_SCAN
+            logger.debug("QR token recreated successfully")
             return self._qr_login.url
+        except errors.SessionPasswordNeededError:
+            logger.info("2FA required (refresh skipped — handled by wait)")
+            return None
+        except errors.AuthRestartError:
+            logger.warning("AuthRestartError during QR recreate — resetting")
+            await self.reset_session()
+            return None
         except Exception as exc:
             logger.error("QR recreate error: %s", exc)
             self.auth_state = AuthState.ERROR
@@ -346,9 +383,11 @@ class TelegramClientWrapper:
 
     async def check_2fa_password(self, password: str) -> bool:
         """Complete 2FA password entry."""
+        logger.debug("Submitting 2FA password...")
         try:
             await self.client.sign_in(password=password)
             self.auth_state = AuthState.AUTHENTICATED
+            logger.info("2FA password accepted — authenticated")
             return True
         except errors.PasswordHashInvalidError:
             logger.warning("Invalid 2FA password")
