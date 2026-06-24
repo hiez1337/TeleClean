@@ -30,6 +30,15 @@ Telegram channel IDs exceed 32-bit signed int. All signal declarations must use 
 ## QR login gotcha
 When the server returns `LoginTokenSuccess` (already authorized; session is still alive despite local reset), `get_qr_token()` returns the string `"LOGIN_SUCCESS"`, not a URL. Upstream callers must handle this: it means *skip QR, go to authenticated state*.
 
+## reset_session() — log_out + new TelegramClient
+`reset_session()` calls `client.log_out()` so the server invalidates the session on ALL devices (phone sees "session terminated"). After `log_out()`, Telethon's own docs say *"client is unusable — create a new instance"*. The code creates a brand-new `TelegramClient` with zero stale state. This is why you must NOT reuse the old `TelegramClient` directly.
+
+## SessionPasswordNeededError — handled, not an error
+2FA after QR scan raises `SessionPasswordNeededError`. The worker logs it as `DEBUG` (not `ERROR`) when an `on_error` callback exists. The auth widget catches it and switches to the 2FA password page. `refresh_qr_token()` also catches it silently.
+
+## Stale-task cancellation
+`_restart_auth()` cancels any in-flight `load_channels` future before calling `reset_session()`. Without this, a flood-waiting `get_dialogs()` would resume on the new `TelegramClient` before `connect()` finishes. `_on_channels_loaded` also checks `auth_state` as a guard.
+
 ## Async worker pattern
 Use `_run_async(coro, on_result=fn, on_error=fn)` from MainWindow. Both callbacks always run on the Qt main thread. Never call GUI methods from the worker thread directly.
 
