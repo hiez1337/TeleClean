@@ -15,6 +15,7 @@ pyinstaller ^
     --hidden-import "telethon" ^
     --hidden-import "qrcode" ^
     --hidden-import "PIL" ^
+    --hidden-import "app.core.api_keys" ^
     --hidden-import "PIL._imaging" ^
     --hidden-import "dotenv" ^
     --collect-all "telethon" ^
