@@ -600,6 +600,9 @@ class MainWindow(QMainWindow):
             L("Connected", str(c.client.is_connected()))
             L("Auth state", c.auth_state.value if c.auth_state else "None")
             L("Has QR login", str(hasattr(c, '_qr_login') and c._qr_login is not None))
+            if c.last_error:
+                L("Last error", c.last_error)
+            L("Telethon version", getattr(c.client, '__version__', '?'))
         except Exception as e:
             L("Client", f"ERROR: {e}")
 

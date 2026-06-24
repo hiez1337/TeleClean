@@ -65,8 +65,10 @@ class TelegramClientWrapper:
     -----
     Called from a background thread (QThread) that runs an asyncio event loop.
 
-    API keys: tries .env first, falls back to embedded keys (api_keys.py).
+    API keys: tries .env first, falls back to embedded keys (keys.json).
     """
+
+    last_error: str = ""
 
     def __init__(self) -> None:
         api_id_s = os.getenv("TELEGRAM_API_ID")
@@ -206,17 +208,26 @@ class TelegramClientWrapper:
         Returns the ``tg://login`` URL (string) that should be rendered as
         a QR code, or None on failure.
         """
-        try:
-            if not self.client.is_connected():
+        for attempt in range(2):
+            try:
+                if not self.client.is_connected():
+                    await self.client.connect()
+                self._qr_login = await self.client.qr_login()
+                self._last_qr_token = self._qr_login.token
+                self.auth_state = AuthState.WAITING_FOR_QR_SCAN
+                self.last_error = ""
+                return self._qr_login.url
+            except errors.AuthRestartError as exc:
+                self.last_error = f"AuthRestartError (attempt {attempt+1}): {exc}"
+                logger.warning(self.last_error)
+                await self.reset_session()
                 await self.client.connect()
-            self._qr_login = await self.client.qr_login()
-            self._last_qr_token = self._qr_login.token
-            self.auth_state = AuthState.WAITING_FOR_QR_SCAN
-            return self._qr_login.url
-        except Exception as exc:
-            logger.error("QR login error: %s", exc)
-            self.auth_state = AuthState.ERROR
-            return None
+            except Exception as exc:
+                self.last_error = f"{type(exc).__name__}: {exc}"
+                logger.error("QR login error: %s", self.last_error)
+                break
+        self.auth_state = AuthState.ERROR
+        return None
 
     async def refresh_qr_token(self) -> Optional[str]:
         """Refresh (recreate) the QR token after expiry.
