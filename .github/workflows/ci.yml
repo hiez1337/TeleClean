@@ -53,6 +53,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -74,17 +76,32 @@ jobs:
           name: TeleClean.exe
           path: dist/TeleClean.exe
 
+      - name: Determine version
+        id: version
+        run: |
+          $count = (git rev-list --count HEAD)
+          Write-Output "tag=v2.0.$count" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: "TeleClean v1.0.${{ github.run_number }}"
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "TeleClean ${{ steps.version.outputs.tag }}"
           body: |
             Автоматическая сборка из ветки main.
-            - Commit: ${{ github.sha }}
-            - Python 3.12 + PySide6
-            - API-ключи вшиты, .env не требуется
+
+            ### Что нового
+            - 📺 **Каналы** — массовый выход из broadcast-каналов
+            - 👥 **Чаты** — поддержка групп и супергрупп (выход через `DeleteChatUserRequest`)
+            - 🤖 **Боты** — личные чаты с ботами (удаление диалога)
+            - 🗑 **Удалённые аккаунты** — находит и удаляет чаты с деактивированными пользователями
+            - 🏷 **Вкладки** — `QTabWidget` с отдельным списком для каждого типа диалогов
+            - 🔄 **get_all_dialogs()** — загружает все типы диалогов вместо только каналов
+
+            **Коммит:** ${{ github.sha }}
+            **Стек:** Python 3.12 + PySide6 + Telethon
+            **API-ключи:** вшиты, `.env` не требуется
           files: dist/TeleClean.exe
-          generate_release_notes: false
+          generate_release_notes: true
           make_latest: true
