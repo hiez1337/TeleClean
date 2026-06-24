@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import sys
 from enum import Enum
 from typing import Callable, Optional
 
@@ -19,21 +18,11 @@ from telethon.tl.functions.channels import LeaveChannelRequest
 from telethon.tl.types import Channel
 
 from app.models.channel import Channel as ChannelModel
-from app.services.session_service import get_avatar_path, get_session_path
+from app.services.session_service import get_avatar_path, get_session_path, load_api_keys
 
-# Load embedded API keys from bundled keys.json (CI sets these at build time)
-_BUILD_API_ID = 0
-_BUILD_API_HASH = ""
-try:
-    _base = sys._MEIPASS  # PyInstaller temp dir
-except AttributeError:
-    _base = os.path.dirname(__file__)  # dev mode
-_keys_path = os.path.join(_base, "keys.json")
-if os.path.exists(_keys_path):
-    with open(_keys_path) as _f:
-        _k = __import__("json").load(_f)
-    _BUILD_API_ID = _k["api_id"]
-    _BUILD_API_HASH = _k["api_hash"]
+# Built-in fallback keys (committed to repo, overwritten by CI at build time)
+_BUILD_API_ID = 11600115
+_BUILD_API_HASH = "dabf2aadd76c3a56983809d54c0760c6"
 
 logger = logging.getLogger(__name__)
 
@@ -73,17 +62,25 @@ class TelegramClientWrapper:
     def __init__(self) -> None:
         api_id_s = os.getenv("TELEGRAM_API_ID")
         api_hash_s = os.getenv("TELEGRAM_API_HASH")
+        api_id = None
+        api_hash = None
 
+        # 1. Environment (.env)
         if api_id_s and api_hash_s:
-            self._api_id = int(api_id_s)
-            self._api_hash = api_hash_s
-        elif _BUILD_API_ID:
-            self._api_id = _BUILD_API_ID
-            self._api_hash = _BUILD_API_HASH
-        else:
-            raise RuntimeError(
-                "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env"
-            )
+            api_id = int(api_id_s)
+            api_hash = api_hash_s
+        # 2. Saved config (Settings dialog)
+        saved = load_api_keys()
+        if not api_id and saved.get("api_id"):
+            api_id = saved["api_id"]
+            api_hash = saved["api_hash"]
+        # 3. Built-in fallback
+        if not api_id:
+            api_id = _BUILD_API_ID
+            api_hash = _BUILD_API_HASH
+
+        self._api_id = api_id
+        self._api_hash = api_hash or ""
         self._session_path: str = get_session_path()
 
         self.client: TelegramClient = TelegramClient(

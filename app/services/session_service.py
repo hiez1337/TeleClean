@@ -47,6 +47,22 @@ def get_avatar_path(channel_id: int) -> Path:
     return get_avatar_cache_dir() / f"{channel_id}.jpg"
 
 
+API_KEYS_CONFIG_KEY = "api_keys"
+
+
+def load_api_keys() -> dict[str, Any]:
+    """Load saved API keys from config."""
+    cfg = load_config()
+    return cfg.get(API_KEYS_CONFIG_KEY, {})
+
+
+def save_api_keys(api_id: int, api_hash: str) -> None:
+    """Save API keys to config so they survive restarts."""
+    cfg = load_config()
+    cfg[API_KEYS_CONFIG_KEY] = {"api_id": api_id, "api_hash": api_hash}
+    save_config(cfg)
+
+
 def load_config() -> dict[str, Any]:
     """Load UI settings from ``.teleclean/config.json``.
 

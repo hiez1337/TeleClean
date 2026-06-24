@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QProgressBar,
@@ -223,6 +224,10 @@ class MainWindow(QMainWindow):
         self._light_theme_action.setCheckable(True)
         self._light_theme_action.triggered.connect(lambda: self._set_theme("light"))
         theme_menu.addAction(self._light_theme_action)
+        settings_menu.addSeparator()
+        api_action = QAction("API ключи Telegram", self)
+        api_action.triggered.connect(self._show_api_settings)
+        settings_menu.addAction(api_action)
 
         # Help menu
         help_menu = menubar.addMenu("Помощь")
@@ -547,6 +552,68 @@ class MainWindow(QMainWindow):
         )
 
     # ------------------------------------------------------------------
+    # API Settings
+    # ------------------------------------------------------------------
+
+    @Slot()
+    def _show_api_settings(self) -> None:
+        """Dialog to view/enter Telegram API keys."""
+        from app.services.session_service import load_api_keys, save_api_keys
+
+        saved = load_api_keys()
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("API ключи Telegram")
+        dlg.setMinimumWidth(420)
+        layout = QVBoxLayout(dlg)
+
+        info = QLabel(
+            "API ключи нужны для подключения к Telegram.\n"
+            "Получить: https://my.telegram.org/apps\n"
+            "Встроенные ключи работают по умолчанию.\n"
+            "Заполните поля только если они не работают."
+        )
+        info.setWordWrap(True)
+        layout.addWidget(info)
+
+        layout.addWidget(QLabel("API ID:"))
+        id_input = QLineEdit()
+        id_input.setPlaceholderText("11600115")
+        id_input.setText(str(saved.get("api_id", "")))
+        layout.addWidget(id_input)
+
+        layout.addWidget(QLabel("API Hash:"))
+        hash_input = QLineEdit()
+        hash_input.setPlaceholderText("dabf2aadd76c3a56983809d54c0760c6")
+        hash_input.setText(saved.get("api_hash", ""))
+        layout.addWidget(hash_input)
+
+        layout.addWidget(QLabel(
+            "После сохранения перезапустите приложение, чтобы новые ключи вступили в силу."
+        ))
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(lambda: _save())
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+
+        def _save():
+            aid = id_input.text().strip()
+            ah = hash_input.text().strip()
+            if aid and ah:
+                try:
+                    save_api_keys(int(aid), ah)
+                    QMessageBox.information(dlg, "Сохранено",
+                        "Ключи сохранены. Перезапустите приложение.")
+                    dlg.accept()
+                except ValueError:
+                    QMessageBox.warning(dlg, "Ошибка", "API ID должен быть числом")
+            else:
+                QMessageBox.warning(dlg, "Ошибка", "Заполните оба поля")
+
+        dlg.exec()
+
+    # ------------------------------------------------------------------
     # Debug
     # ------------------------------------------------------------------
 
@@ -564,18 +631,18 @@ class MainWindow(QMainWindow):
 
         L("", "")
         L("--- API Keys ---", "")
-        api_id_s = os.getenv("TELEGRAM_API_ID")
-        if api_id_s:
-            L("TELEGRAM_API_ID", "set (from .env)")
+        from app.services.session_service import load_api_keys
+        saved = load_api_keys()
+        env_id = os.getenv("TELEGRAM_API_ID")
+        if env_id:
+            L("Source", "Environment (.env)")
+        elif saved.get("api_id"):
+            L("Source", "Settings (config.json)")
         else:
-            try:
-                from app.core.telegram_client import _BUILD_API_ID
-                if _BUILD_API_ID:
-                    L("TELEGRAM_API_ID", f"embedded (keys.json) id={_BUILD_API_ID}")
-                else:
-                    L("TELEGRAM_API_ID", "MISSING (0)")
-            except Exception as e:
-                L("TELEGRAM_API_ID", f"ERROR: {e}")
+            L("Source", "Built-in (telegram_client.py)")
+        L("API ID used", str(self._client._api_id) if hasattr(self._client, '_api_id') else "?")
+        L("API ID from settings", str(saved.get("api_id", "")) if saved else "not saved")
+        L("API Hash from settings", "set" if saved.get("api_hash") else "not saved")
 
         L("", "")
         L("--- Paths ---", "")
