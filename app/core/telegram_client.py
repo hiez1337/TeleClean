@@ -89,6 +89,7 @@ class TelegramClientWrapper:
             self._api_hash,
             device_model="TeleClean Desktop",
             app_version="1.0.0",
+            receive_updates=True,
         )
 
         self._auth_state: AuthState = AuthState.NOT_AUTHENTICATED

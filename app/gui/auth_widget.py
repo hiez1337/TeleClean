@@ -327,8 +327,7 @@ class AuthWidget(QWidget):
         """
         def _on_token(token):
             if token == "LOGIN_SUCCESS":
-                if on_done:
-                    on_done()
+                self.authenticated.emit()
             elif token:
                 self._display_qr(token)
                 if on_done:
