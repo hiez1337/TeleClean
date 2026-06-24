@@ -7,7 +7,6 @@ bulk-leave workflow with progress reporting.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Slot
@@ -230,14 +229,13 @@ class MainWindow(QMainWindow):
     # Async helpers
     # ------------------------------------------------------------------
 
-    def _run_async(self, coro, callback=None, errback=None):
-        """Schedule a coroutine on the worker thread.
-
-        If *callback* is provided, it is called on the Qt main thread with
-        the result.  If *errback* is provided, it is called with the
-        exception.
-        """
-        return self._worker.run_and_emit(coro, callback, errback)
+    def _run_async(self, coro, on_result=None, on_error=None):
+        """Schedule a coroutine on the worker thread."""
+        return self._worker.run_and_emit(
+            coro,
+            on_result=on_result,
+            on_error=on_error,
+        )
 
     # ------------------------------------------------------------------
     # Authentication flow
@@ -248,8 +246,8 @@ class MainWindow(QMainWindow):
         """Called shortly after startup to begin auth."""
         self._run_async(
             self._client.start_with_session(),
-            callback=self._on_session_check_done,
-            errback=lambda exc: self._auth_widget._show_error(str(exc)),
+            on_result=self._on_session_check_done,
+            on_error=lambda exc: self._auth_widget._show_error(str(exc)),
         )
 
     def _on_session_check_done(self, restored: bool) -> None:
@@ -260,8 +258,8 @@ class MainWindow(QMainWindow):
             # Start QR auth: connect first, then begin flow
             self._run_async(
                 self._client.connect(),
-                callback=lambda _: self._auth_widget._start_qr_flow(),
-                errback=lambda exc: self._auth_widget._show_error(str(exc)),
+                on_result=lambda _: self._auth_widget._start_qr_flow(),
+                on_error=lambda exc: self._auth_widget._show_error(str(exc)),
             )
 
     @Slot()
@@ -270,8 +268,8 @@ class MainWindow(QMainWindow):
         self._status_label.setText("Авторизация успешна. Загружаю каналы...")
         self._run_async(
             self._load_channels_async(),
-            callback=self._on_channels_loaded,
-            errback=lambda exc: self._status_label.setText(
+            on_result=self._on_channels_loaded,
+            on_error=lambda exc: self._status_label.setText(
                 f"Ошибка загрузки каналов: {exc}"
             ),
         )
@@ -306,8 +304,8 @@ class MainWindow(QMainWindow):
         self._status_label.setText("Обновление списка каналов...")
         self._run_async(
             self._channel_manager.load_channels(force_refresh=True),
-            callback=self._on_refresh_complete,
-            errback=lambda exc: self._status_label.setText(
+            on_result=self._on_refresh_complete,
+            on_error=lambda exc: self._status_label.setText(
                 f"Ошибка обновления: {exc}"
             ),
         )
@@ -322,7 +320,7 @@ class MainWindow(QMainWindow):
     # Selection
     # ------------------------------------------------------------------
 
-    @Slot(int)
+    @Slot(object)
     def _on_selection_changed(self, count: int) -> None:
         self._leave_btn.setEnabled(count > 0)
         if count > 0:
@@ -381,25 +379,34 @@ class MainWindow(QMainWindow):
         self._log_area.clear()
         self._stop_btn.setEnabled(True)
 
+        # Wrap Qt callbacks so they run on the main thread via the worker's
+        # signal dispatch (Qt.QueuedConnection).
         callbacks = LeaveProgressCallback(
-            on_progress=self._update_progress,
-            on_channel_done=self._log_channel_result,
-            on_complete=self._on_leave_complete,
+            on_progress=self._wrap_qt_callback(self._update_progress),
+            on_channel_done=self._wrap_qt_callback(self._log_channel_result),
+            on_complete=self._wrap_qt_callback(self._on_leave_complete),
             on_stop=lambda: not self._leave_running,
         )
 
         self._run_async(
             self._channel_manager.bulk_leave(channels, callbacks),
-            errback=lambda exc: self._on_leave_error(exc),
+            on_error=lambda exc: self._on_leave_error(exc),
         )
 
+    def _wrap_qt_callback(self, func):
+        """Return a wrapper that dispatches *func* to the Qt main thread."""
+        def wrapper(*args):
+            if self._worker.isRunning():
+                self._worker._callback_dispatch.emit(lambda: func(*args))
+        return wrapper
+
     def _update_progress(self, current: int, total: int, title: str) -> None:
-        """Update progress bar and label (called from worker thread)."""
+        """Update progress bar and label (must be called from main thread)."""
         self._progress_bar.setValue(current)
         self._progress_label.setText(f"Обрабатывается: {title}  [{current}/{total}]")
 
     def _log_channel_result(self, channel_id: int, title: str, status: str) -> None:
-        """Log the result of leaving one channel (called from worker thread)."""
+        """Log the result of leaving one channel (must be called from main thread)."""
         status_map = {
             "success": "✅ Успешно",
             "rate_limited": "⏳ Rate limit",
@@ -409,6 +416,8 @@ class MainWindow(QMainWindow):
         }
         msg = f"{status_map.get(status, status)}: {title}"
         self._log_area.append(msg)
+        if status == "success":
+            self._channel_list.mark_channels_left([channel_id])
 
     @Slot()
     def _on_stop_leave(self) -> None:
@@ -424,15 +433,16 @@ class MainWindow(QMainWindow):
         self._stop_btn.setEnabled(False)
         self._progress_label.setText(f"✅ Завершено: {success} успешно, {errors} с ошибками")
 
+        left = self._channel_list.left_count()
         QMessageBox.information(
             self,
             "Выход завершён",
             f"✅ Успешно: {success}\n"
             f"❌ С ошибками: {errors}\n\n"
-            "Обновите список каналов, чтобы увидеть изменения.",
+            "Покинутые каналы отмечены в списке. "
+            "Нажмите «Обновить», чтобы убрать их.",
         )
 
-        # Re-enable controls
         self._channel_list.setEnabled(True)
         self._refresh_btn.setEnabled(True)
 
@@ -498,15 +508,17 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        # Clear session (await disconnect on worker, then clean up)
-        self._run_async(self._client.disconnect())
+        self._status_label.setText("Отключаюсь от Telegram...")
 
-        # Clear session file using the session service path
-        from app.services.session_service import get_session_path
-        session_path = get_session_path("teleclean") + ".session"
-        if os.path.exists(session_path):
-            os.unlink(session_path)
+        # Reset session (disconnect + clear auth key in SQLite)
+        self._run_async(
+            self._client.reset_session(),
+            on_result=lambda _: self._on_session_reset(),
+        )
 
+    def _on_session_reset(self) -> None:
+        """Reset UI and restart auth after session has been cleared."""
+        self._auth_widget.reset_widget()
         self._channel_manager.clear_cache()
         self._stack.setCurrentIndex(0)
         self._status_label.setText("Авторизация сброшена")

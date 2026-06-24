@@ -30,12 +30,11 @@ from PySide6.QtWidgets import (
 
 from telethon import errors
 
-from app.core.telegram_client import AuthState, TelegramClientWrapper
+from app.core.telegram_client import TelegramClientWrapper
 
 logger = logging.getLogger(__name__)
 
 QR_REFRESH_INTERVAL_S = 30
-QR_POLL_INTERVAL_S = 2
 
 
 class AuthWidget(QWidget):
@@ -72,8 +71,6 @@ class AuthWidget(QWidget):
 
         # Timer for QR refresh (Qt main-thread timer)
         self._qr_refresh_timer: Optional[QTimer] = None
-        # Timer for polling QR scan status
-        self._qr_poll_timer: Optional[QTimer] = None
 
         self._build_ui()
 
@@ -227,52 +224,136 @@ class AuthWidget(QWidget):
     # Public API
     # ------------------------------------------------------------------
 
+    def reset_widget(self) -> None:
+        """Reset all auth pages to their clean initial state.
+
+        Hides error labels, clears text inputs, re-enables buttons, and
+        switches the internal stack to the QR page (index 0).  Call this
+        **before** showing the widget after a session reset.
+        """
+        # Stop any running timers / flows
+        self.stop_auth_flow()
+
+        # Reset QR page
+        self._qr_label.clear()
+        self._qr_status.setText("Генерация QR-кода...")
+        self._qr_error.setVisible(False)
+        self._qr_error.setText("")
+
+        # Reset phone page
+        self._phone_input.clear()
+        self._phone_input.setEnabled(True)
+        self._send_code_btn.setEnabled(True)
+        self._send_code_btn.setVisible(True)
+        self._code_input.clear()
+        self._code_input.setVisible(False)
+        self._confirm_code_btn.setEnabled(True)
+        self._confirm_code_btn.setVisible(False)
+        self._phone_status.setText("")
+        self._phone_error.setVisible(False)
+        self._phone_error.setText("")
+
+        # Reset 2FA page
+        self._tfa_input.clear()
+        self._tfa_btn.setEnabled(True)
+        self._tfa_error.setVisible(False)
+        self._tfa_error.setText("")
+
+        # Switch to QR page
+        self._stack.setCurrentIndex(0)
+
     def _start_qr_flow(self) -> None:
         """Begin QR-code authorisation (must be called from Qt main thread).
 
-        Sets up timers for QR refresh and scan-polling, then generates
-        the first QR code via the async worker.
-        """
-        # Initial QR generation — async part runs on worker, callback
-        # handles GUI update on main thread.
-        self._generate_qr(on_error=lambda msg: self._qr_status.setText(msg))
+        Shows the initial QR code, sets up a 30-second refresh timer,
+        and starts a long-polling ``QRLogin.wait()`` that must be active
+        while the QR is displayed.
 
+        The wait is started **after** the QR token is created to avoid a
+        race where ``wait_for_qr_accept()`` runs before ``_qr_login`` is
+        stored (→ immediate False return, wait never actually runs).
+        """
+        self._stack.setCurrentIndex(0)  # Ensure QR page is shown
+        self._generate_qr(
+            on_error=lambda msg: self._qr_status.setText(msg),
+            on_done=self._start_wait_after_qr,
+        )
+
+    def _start_wait_after_qr(self) -> None:
+        """Start the QR refresh timer and the long-lived wait.
+
+        Called once ``_generate_qr`` has successfully stored the QRLogin
+        object on the client.
+        """
         # QTimer for QR refresh (30 s) — fires on Qt main thread
         self._qr_refresh_timer = QTimer(self)
         self._qr_refresh_timer.timeout.connect(self._on_qr_refresh)
         self._qr_refresh_timer.start(QR_REFRESH_INTERVAL_S * 1000)
 
-        # QTimer for polling QR scan — every 2 s on Qt main thread
-        self._qr_poll_timer = QTimer(self)
-        self._qr_poll_timer.timeout.connect(self._on_poll_qr)
-        self._qr_poll_timer.start(QR_POLL_INTERVAL_S * 1000)
+        # Start a single long-lived async wait for QR scan (up to 5 min)
+        self._run_async(
+            self._client.wait_for_qr_accept(timeout=300.0),
+            on_result=lambda success: self._on_qr_accepted() if success else None,
+            on_error=self._on_qr_error,
+        )
+
+    def _on_qr_error(self, exc: Exception) -> None:
+        """Handle error from the QR wait loop on the main thread."""
+        if isinstance(exc, errors.SessionPasswordNeededError):
+            # 2FA required after QR scan — switch to password page
+            logger.info("2FA required after QR scan")
+            if self._qr_refresh_timer:
+                self._qr_refresh_timer.stop()
+            self._qr_status.setText("Требуется пароль двухфакторной аутентификации")
+            self._stack.setCurrentIndex(2)
+        else:
+            self._show_error(f"Ошибка QR: {exc}")
 
     def stop_auth_flow(self) -> None:
         """Stop all auth-related timers (call from main thread)."""
         if self._qr_refresh_timer:
             self._qr_refresh_timer.stop()
-        if self._qr_poll_timer:
-            self._qr_poll_timer.stop()
 
     # ------------------------------------------------------------------
     # QR flow
     # ------------------------------------------------------------------
 
-    def _generate_qr(self, on_error=None):
-        """Schedule a QR-code generation on the async worker.
+    def _generate_qr(self, on_error=None, on_done=None):
+        """Schedule first-time QR-code generation on the async worker.
 
-        Callback handles GUI updates on the main thread.
+        ``on_done()`` is called on the main thread after the QR code has
+        been successfully generated and displayed — use it to start the
+        wait loop *after* the QRLogin object is guaranteed to exist.
         """
+        def _on_token(token):
+            if token:
+                self._display_qr(token)
+                if on_done:
+                    on_done()
+            elif on_error:
+                on_error("Ошибка генерации QR-кода")
+
         self._run_async(
             self._client.get_qr_token(),
+            on_result=_on_token,
+        )
+
+    def _refresh_qr(self, on_error=None):
+        """Refresh QR code (uses recreate() on existing QRLogin object).
+
+        Unlike _generate_qr, this does NOT create a new QRLogin — it
+        reuses the existing one so the running wait() stays valid.
+        """
+        self._run_async(
+            self._client.refresh_qr_token(),
             on_result=lambda token: self._display_qr(token) if token else (
-                on_error("Ошибка генерации QR-кода") if on_error else None
+                on_error("Ошибка обновления QR-кода") if on_error else None
             ),
         )
 
-    def _display_qr(self, token: bytes) -> None:
-        """Convert token bytes to a QR image and display it (main thread)."""
-        qr_img: PILImage = qrcode.make(token, box_size=6)
+    def _display_qr(self, qr_url: str) -> None:
+        """Convert a ``tg://login`` URL to a QR image and display it (main thread)."""
+        qr_img: PILImage = qrcode.make(qr_url, box_size=6)
         buffer = io.BytesIO()
         qr_img.save(buffer, format="PNG")
         buffer.seek(0)
@@ -285,23 +366,13 @@ class AuthWidget(QWidget):
 
     @Slot()
     def _on_qr_refresh(self) -> None:
-        """QTimer slot: refresh the QR code image."""
-        self._generate_qr(on_error=lambda msg: self._qr_status.setText(msg))
-
-    @Slot()
-    def _on_poll_qr(self) -> None:
-        """QTimer slot: check whether the QR code was scanned."""
-        self._run_async(
-            self._client.wait_for_qr_accept(timeout=QR_POLL_INTERVAL_S),
-            on_result=lambda success: self._on_qr_accepted() if success else None,
-        )
+        """QTimer slot: refresh the QR code image (uses recreate)."""
+        self._refresh_qr(on_error=lambda msg: self._qr_status.setText(msg))
 
     def _on_qr_accepted(self) -> None:
         """Called when QR scan succeeded."""
         if self._qr_refresh_timer:
             self._qr_refresh_timer.stop()
-        if self._qr_poll_timer:
-            self._qr_poll_timer.stop()
         self.authenticated.emit()
 
     # ------------------------------------------------------------------
@@ -411,3 +482,12 @@ class AuthWidget(QWidget):
         self._tfa_error.setText(message)
         self._tfa_error.setVisible(True)
         self._tfa_btn.setEnabled(True)
+
+    def _show_error(self, message: str) -> None:
+        """Display an error message on the current page."""
+        if self._stack.currentIndex() == 0:
+            self._qr_error.setText(message)
+            self._qr_error.setVisible(True)
+        else:
+            self._phone_error.setText(message)
+            self._phone_error.setVisible(True)

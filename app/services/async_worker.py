@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from concurrent.futures import Future
+from concurrent.futures import CancelledError, Future
 from typing import Any, Awaitable, Callable, Optional
 
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,9 @@ class AsyncWorkerSignals(QObject):
 
 class AsyncWorker(QThread):
     """QThread that runs an asyncio event loop.
+
+    Ensures all result/error callbacks are dispatched to the Qt main
+    thread via a queued signal, so GUI updates are always thread-safe.
 
     Usage
     -----
@@ -42,11 +45,32 @@ class AsyncWorker(QThread):
         worker.wait()
     """
 
+    # Internal signal for dispatching callbacks to the main thread.
+    # Carries a zero-arg callable that the main-thread slot will invoke.
+    _callback_dispatch = Signal(object)
+
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self.signals = AsyncWorkerSignals()
         self._running = False
+
+        self.signals = AsyncWorkerSignals()
+
+        # Connect the dispatch signal with a queued connection so that
+        # ``emit`` from the worker thread queues the callable to run on
+        # the main thread.
+        self._callback_dispatch.connect(
+            self._on_callback,
+            Qt.QueuedConnection,
+        )
+
+    @Slot(object)
+    def _on_callback(self, callback: Callable[[], None]) -> None:
+        """Execute a callback on the Qt main thread."""
+        try:
+            callback()
+        except Exception as exc:
+            logger.exception("Main-thread callback error: %s", exc)
 
     def run(self) -> None:
         """QThread entry point: start the asyncio event loop."""
@@ -91,8 +115,8 @@ class AsyncWorker(QThread):
     ) -> Future:
         """Schedule a coroutine and route result/error to callbacks.
 
-        The callbacks are dispatched on the **caller's thread** (normally
-        the Qt main thread).
+        Both *on_result* and *on_error* are always dispatched on the Qt
+        **main thread**, making them safe for GUI updates.
         """
         future = self.run_coroutine(coro)
 
@@ -100,11 +124,18 @@ class AsyncWorker(QThread):
             try:
                 result = f.result()
                 if on_result is not None:
-                    on_result(result)
+                    self._callback_dispatch.emit(
+                        lambda r=result: on_result(r)
+                    )
+            except CancelledError:
+                logger.debug("Async operation cancelled")
             except Exception as exc:
                 logger.exception("Async operation failed")
                 if on_error is not None:
-                    on_error(exc)
+                    # Capture exc in closure via default argument (PEP 626)
+                    self._callback_dispatch.emit(
+                        lambda e=exc: on_error(e)
+                    )
 
         future.add_done_callback(_done)
         return future

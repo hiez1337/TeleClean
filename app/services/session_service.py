@@ -19,8 +19,10 @@ def get_data_dir() -> Path:
     """Return the path to the app data directory (``.teleclean/``).
 
     Creates the directory if it does not exist.
+    Resolved by walking up from the known package path
+    ``app/services/session_service.py``.
     """
-    data_dir = Path(os.path.dirname(os.path.abspath(__file__))).parent.parent / ".teleclean"
+    data_dir = Path(__file__).resolve().parent.parent.parent / ".teleclean"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
@@ -28,6 +30,18 @@ def get_data_dir() -> Path:
 def get_session_path(session_name: str = "teleclean") -> str:
     """Return the absolute path for a Telethon session file (without extension)."""
     return str(get_data_dir() / session_name)
+
+
+def get_avatar_cache_dir() -> Path:
+    """Return the path to the avatar cache directory (``.teleclean/avatars/``)."""
+    avatars_dir = get_data_dir() / "avatars"
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+    return avatars_dir
+
+
+def get_avatar_path(channel_id: int) -> Path:
+    """Return the cached avatar path for a channel."""
+    return get_avatar_cache_dir() / f"{channel_id}.jpg"
 
 
 def load_config() -> dict[str, Any]:

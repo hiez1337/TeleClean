@@ -217,6 +217,9 @@ class ChannelManager:
                 status = result.value if isinstance(result, LeaveResult) else "error"
                 callbacks.on_channel_done(channel.id, channel.title, status)
 
+            if not self._running:
+                break
+
             # Update history
             history_entry["completed"] = i + 1
             history_entry["success"] = success_count
@@ -226,7 +229,7 @@ class ChannelManager:
                 )
             save_leave_history(history)
 
-            if result == LeaveResult.SUCCESS:
+            if result == LeaveResult.SUCCESS and self._running:
                 await asyncio.sleep(delay_between)
 
         history_entry["finished_at"] = time.time()

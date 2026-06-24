@@ -9,22 +9,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import time
 from enum import Enum
-from typing import Optional
+from typing import Callable, Optional
 
-from dotenv import load_dotenv
 from telethon import TelegramClient, errors
+from telethon.sessions import SQLiteSession
 from telethon.tl.functions.channels import LeaveChannelRequest
 from telethon.tl.types import Channel
 
 from app.models.channel import Channel as ChannelModel
-from app.services.session_service import get_session_path
+from app.services.session_service import get_avatar_path, get_session_path
 
 logger = logging.getLogger(__name__)
-
-# Load environment variables once at import time
-load_dotenv()
 
 
 class AuthState(Enum):
@@ -53,6 +49,8 @@ class TelegramClientWrapper:
     Usage
     -----
     Called from a background thread (QThread) that runs an asyncio event loop.
+
+    API keys: tries .env first, falls back to embedded keys (api_keys.py).
     """
 
     def __init__(self) -> None:
@@ -60,12 +58,17 @@ class TelegramClientWrapper:
         api_hash: Optional[str] = os.getenv("TELEGRAM_API_HASH")
 
         if not api_id or not api_hash:
-            raise RuntimeError(
-                "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env"
-            )
-
-        self._api_id: int = int(api_id)
-        self._api_hash: str = api_hash
+            try:
+                from app.core.api_keys import API_ID, API_HASH
+                self._api_id = API_ID
+                self._api_hash = API_HASH
+            except ImportError:
+                raise RuntimeError(
+                    "TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env"
+                )
+        else:
+            self._api_id = int(api_id)
+            self._api_hash = api_hash
         self._session_path: str = get_session_path()
 
         self.client: TelegramClient = TelegramClient(
@@ -108,13 +111,68 @@ class TelegramClientWrapper:
         await self.client.disconnect()
         self.auth_state = AuthState.NOT_AUTHENTICATED
 
+    async def reset_session(self) -> None:
+        """Disconnect and destroy session data for fresh authorization.
+
+        Closes the SQLite session file, deletes it (and journal/WAL files)
+        from disk, and creates a fresh empty session.  On the next
+        ``start_with_session()`` the client will require QR / phone login
+        because no auth data exists.
+        """
+        # 1. Disconnect from Telegram
+        await self.client.disconnect()
+
+        # 2. Close the SQLite session to release the file lock
+        try:
+            self.client.session.close()
+        except Exception as exc:
+            logger.warning("Error closing session: %s", exc)
+
+        # 3. Delete the session file AND any SQLite journal/WAL files
+        session_base = get_session_path()
+        for suffix in (".session", ".session-journal", ".session-wal", ".session-shm"):
+            f = session_base + suffix
+            try:
+                if os.path.exists(f):
+                    os.unlink(f)
+                    logger.info("Deleted %s", f)
+            except PermissionError:
+                logger.warning("Permission denied deleting %s", f)
+            except Exception as exc:
+                logger.error("Failed to delete %s: %s", f, exc)
+
+        # 4. Replace the in-memory session with a fresh empty one so the
+        #    same client object can reconnect without SQLite table errors.
+        try:
+            self.client.session = SQLiteSession(self._session_path)
+            logger.info("Created fresh empty SQLiteSession")
+        except Exception as exc:
+            logger.error("Failed to create fresh session: %s", exc)
+
+        # 5. Force _authorized to False so is_user_authorized() skips the
+        #    server round-trip altogether and returns False immediately.
+        self.client._authorized = False
+
+        # 6. Reset internal state
+        self.auth_state = AuthState.NOT_AUTHENTICATED
+        self._qr_login = None
+        self._last_qr_token = None
+
     async def start_with_session(self) -> bool:
         """Try to start the client with an existing session.
 
         Returns True if already authorised.
         """
         await self.connect()
-        if await self.is_user_authorized():
+        authorized = await self.is_user_authorized()
+        logger.info(
+            "start_with_session: is_user_authorized=%s, _authorized=%s, "
+            "auth_key=%s",
+            authorized,
+            getattr(self.client, "_authorized", "N/A"),
+            bool(self.client.session.auth_key),
+        )
+        if authorized:
             self.auth_state = AuthState.AUTHENTICATED
             return True
         return False
@@ -123,38 +181,70 @@ class TelegramClientWrapper:
     # QR-code authorisation
     # ------------------------------------------------------------------
 
-    async def get_qr_token(self) -> Optional[bytes]:
+    async def get_qr_token(self) -> Optional[str]:
         """Generate a new QR login token.
 
-        Returns ``bytes`` that should be rendered as a QR code, or None
-        on failure.
+        Returns the ``tg://login`` URL (string) that should be rendered as
+        a QR code, or None on failure.
         """
         try:
-            result = await self.client.qr_login()
-            self._last_qr_token = result.token
+            self._qr_login = await self.client.qr_login()
+            self._last_qr_token = self._qr_login.token
             self.auth_state = AuthState.WAITING_FOR_QR_SCAN
-            return result.token
+            return self._qr_login.url
         except Exception as exc:
             logger.error("QR login error: %s", exc)
+            self.auth_state = AuthState.ERROR
+            return None
+
+    async def refresh_qr_token(self) -> Optional[str]:
+        """Refresh (recreate) the QR token after expiry.
+
+        Returns the ``tg://login`` URL for the refreshed QR code, or None
+        on failure.  Requires a previous successful ``get_qr_token()`` call.
+        """
+        if not hasattr(self, '_qr_login') or self._qr_login is None:
+            return await self.get_qr_token()
+        try:
+            await self._qr_login.recreate()
+            self._last_qr_token = self._qr_login.token
+            self.auth_state = AuthState.WAITING_FOR_QR_SCAN
+            return self._qr_login.url
+        except Exception as exc:
+            logger.error("QR recreate error: %s", exc)
             self.auth_state = AuthState.ERROR
             return None
 
     async def wait_for_qr_accept(self, timeout: float = 60.0) -> bool:
         """Wait for the user to scan the QR code.
 
-        Returns True once the QR code has been scanned and the user is
-        authenticated.  Returns False if *timeout* seconds elapse.
-        """
-        if self._last_qr_token is None:
-            return False
+        Uses Telethon's built-in ``QRLogin.wait()`` which **must** be
+        running while the QR is displayed for the login to complete.
 
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if await self.is_user_authorized():
-                self.auth_state = AuthState.AUTHENTICATED
-                return True
-            await asyncio.sleep(1.0)
-        return False
+        Returns True once authenticated.  Returns False on timeout.
+
+        Raises
+        ------
+        errors.SessionPasswordNeededError
+            If the account has 2FA enabled — the caller must prompt for
+            the password and complete auth via ``check_2fa_password()``.
+        """
+        if not hasattr(self, '_qr_login') or self._qr_login is None:
+            return False
+        try:
+            await self._qr_login.wait(timeout=timeout)
+            self.auth_state = AuthState.AUTHENTICATED
+            return True
+        except asyncio.TimeoutError:
+            return False
+        except errors.SessionPasswordNeededError:
+            logger.info("2FA password required after QR scan")
+            self.auth_state = AuthState.WAITING_FOR_CODE
+            raise
+        except Exception as exc:
+            logger.error("QR wait error: %s", exc)
+            self.auth_state = AuthState.ERROR
+            return False
 
     # ------------------------------------------------------------------
     # Phone-number authorisation
@@ -239,49 +329,49 @@ class TelegramClientWrapper:
     # Channel listing
     # ------------------------------------------------------------------
 
-    async def get_dialogs(self, offset_date=None, limit: int = 50):
-        """Fetch dialogs (used internally).
+    async def _download_avatar(self, entity: Channel, semaphore: asyncio.Semaphore) -> None:
+        """Download a channel's profile photo to the local cache."""
+        avatar_path = get_avatar_path(entity.id)
+        if avatar_path.exists():
+            return
+        async with semaphore:
+            try:
+                await self.client.download_profile_photo(
+                    entity, file=str(avatar_path)
+                )
+            except Exception as exc:
+                logger.debug("No avatar for channel %d: %s", entity.id, exc)
 
-        Returns raw Telethon Dialog objects.
-        """
-        return await self.client.get_dialogs(
-            offset_date=offset_date,
-            limit=limit,
-        )
-
-    async def get_channels(
+    async def get_all_channels(
         self,
-        offset: int = 0,
-        limit: int = 50,
         on_progress: Optional[Callable[[int, int], None]] = None,
     ) -> list[ChannelModel]:
-        """Retrieve a page of channels the user is a member of.
+        """Fetch every channel the user is a member of.
+
+        Uses Telethon's native ``get_dialogs(limit=None)`` which handles
+        pagination internally, returning all dialogs.  Filters to broadcast
+        channels only and downloads their avatars in the background.
 
         Parameters
         ----------
-        offset : int
-            Number of dialogs to skip.
-        limit : int
-            Maximum number of dialogs to fetch.
         on_progress : callable or None
-            Called as ``on_progress(current, total)`` during fetching.
-
-        Returns
-        -------
-        list[ChannelModel]
-            Channel objects, filtered to actual channels (not users/groups).
+            Called as ``on_progress(current, total)`` during processing.
         """
-        dialogs = await self.client.get_dialogs(limit=offset + limit)
+        dialogs = await self.client.get_dialogs(limit=None)
+        total = len(dialogs)
+
         if on_progress:
-            on_progress(0, len(dialogs))
+            on_progress(0, total)
 
         channels: list[ChannelModel] = []
+        avatar_tasks: list = []
+        sem = asyncio.Semaphore(5)
+
         for i, dialog in enumerate(dialogs):
             if on_progress:
-                on_progress(i + 1, len(dialogs))
+                on_progress(i + 1, total)
             entity = dialog.entity
             if isinstance(entity, Channel) and entity.broadcast:
-                # This is a channel (broadcast = True for channels)
                 channels.append(
                     ChannelModel(
                         id=entity.id,
@@ -295,34 +385,16 @@ class TelegramClientWrapper:
                         is_joined=True,
                     )
                 )
+                avatar_tasks.append(
+                    self._download_avatar(entity, sem)
+                )
 
-        # Apply offset/slicing
-        return channels[offset:offset + limit]
-
-    async def get_all_channels(
-        self,
-        on_progress: Optional[Callable[[int, int], None]] = None,
-    ) -> list[ChannelModel]:
-        """Fetch every channel the user is a member of.
-
-        Iterates through all dialogs with pagination.
-        """
-        all_channels: list[ChannelModel] = []
-        offset = 0
-        page_size = 50
-
-        while True:
-            page = await self.get_channels(
-                offset=offset, limit=page_size, on_progress=on_progress
+        if avatar_tasks:
+            asyncio.ensure_future(
+                asyncio.gather(*avatar_tasks, return_exceptions=True)
             )
-            if not page:
-                break
-            all_channels.extend(page)
-            offset += page_size
-            if len(page) < page_size:
-                break
 
-        return all_channels
+        return channels
 
     # ------------------------------------------------------------------
     # Leaving channels
