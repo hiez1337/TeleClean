@@ -1,0 +1,29 @@
+# Environment variables
+.env
+
+# Telethon session files
+*.session
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Project runtime data
+.teleclean/
+
+# Build artifacts
+build/
+dist/
+*.spec
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
