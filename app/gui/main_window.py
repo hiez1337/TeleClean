@@ -531,12 +531,16 @@ class MainWindow(QMainWindow):
         )
 
     def _on_session_reset(self) -> None:
-        """Reset UI and restart auth after session has been cleared."""
+        """Reset UI and start QR flow after session has been cleared."""
         self._auth_widget.reset_widget()
         self._channel_manager.clear_cache()
         self._stack.setCurrentIndex(0)
         self._status_label.setText("Авторизация сброшена")
-        QTimer.singleShot(1000, self._start_auth)
+        QTimer.singleShot(1000, lambda: self._run_async(
+            self._client.connect(),
+            on_result=lambda _: self._auth_widget._start_qr_flow(),
+            on_error=lambda exc: self._auth_widget._show_error(str(exc)),
+        ))
 
     @Slot()
     def _show_about(self) -> None:
@@ -670,8 +674,27 @@ class MainWindow(QMainWindow):
             if c.last_error:
                 L("Last error", c.last_error)
             L("Telethon version", getattr(c.client, '__version__', '?'))
+            L("_authorized", str(c.client._authorized))
+            L("auth_key exists", str(bool(c.client.session.auth_key)))
+            try:
+                L("Active DC", str(c.client.session.dc_id))
+            except Exception:
+                pass
         except Exception as e:
             L("Client", f"ERROR: {e}")
+
+        L("", "")
+        L("--- Session File ---", "")
+        try:
+            sp = self._client._session_path
+            L("Path", sp)
+            import os
+            for sfx in (".session", ".session-journal", ".session-wal", ".session-shm"):
+                p = sp + sfx
+                if os.path.exists(p):
+                    L(f"  {sfx}", f"exists  size={os.path.getsize(p)}")
+        except Exception as e:
+            L("Session file", f"ERROR: {e}")
 
         L("", "")
         L("--- Worker ---", "")

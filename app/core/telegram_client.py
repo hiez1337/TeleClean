@@ -170,13 +170,6 @@ class TelegramClientWrapper:
         self._qr_login = None
         self._last_qr_token = None
 
-        # 7. Reconnect so the next QR call has a fresh, active connection
-        try:
-            await self.client.connect()
-            logger.info("Reconnected after session reset")
-        except Exception as exc:
-            logger.warning("Reconnect after reset failed: %s", exc)
-
     async def start_with_session(self) -> bool:
         """Try to start the client with an existing session.
 
