@@ -73,3 +73,18 @@ jobs:
         with:
           name: TeleClean.exe
           path: dist/TeleClean.exe
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "TeleClean v1.0.${{ github.run_number }}"
+          body: |
+            Автоматическая сборка из ветки main.
+            - Commit: ${{ github.sha }}
+            - Python 3.12 + PySide6
+            - API-ключи вшиты, .env не требуется
+          files: dist/TeleClean.exe
+          generate_release_notes: false
+          make_latest: true
