@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import QTimer, Slot
 from PySide6.QtGui import QAction
@@ -50,7 +49,7 @@ class MainWindow(QMainWindow):
         # --- Async worker (background asyncio event loop) ---
         self._worker = AsyncWorker(self)
         self._worker.signals.error.connect(self._on_worker_error)
-        self._worker.start()
+        self._worker.signals.started.connect(self._start_auth)
 
         # --- Telegram client ---
         self._client = TelegramClientWrapper()
@@ -66,8 +65,8 @@ class MainWindow(QMainWindow):
         # Apply saved settings
         self._apply_settings()
 
-        # Start auth flow after a short delay (to let the event loop spin up)
-        QTimer.singleShot(500, self._start_auth)
+        # Start the worker (auth begins once the event loop is ready)
+        self._worker.start()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -331,6 +330,17 @@ class MainWindow(QMainWindow):
         else:
             self._leave_btn.setText("🚪 Выйти из выбранных")
 
+    @Slot(list)
+    def _on_leave_requested(self, channel_ids: list) -> None:
+        """Handle leave_requested signal from channel list.
+
+        The signal carries channel IDs; we convert back to Channel
+        objects and start the confirm/leave workflow.
+        """
+        channels = self._channel_list.get_selected_channels()
+        if channels:
+            self._confirm_and_leave()
+
     # ------------------------------------------------------------------
     # Bulk leave
     # ------------------------------------------------------------------
@@ -488,15 +498,14 @@ class MainWindow(QMainWindow):
         if reply != QMessageBox.Yes:
             return
 
-        # Clear session
+        # Clear session (await disconnect on worker, then clean up)
         self._run_async(self._client.disconnect())
 
-        # Clear session file
-        session_path = Path(os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )) / ".teleclean" / "teleclean.session"
-        if session_path.exists():
-            session_path.unlink()
+        # Clear session file using the session service path
+        from app.services.session_service import get_session_path
+        session_path = get_session_path("teleclean") + ".session"
+        if os.path.exists(session_path):
+            os.unlink(session_path)
 
         self._channel_manager.clear_cache()
         self._stack.setCurrentIndex(0)
@@ -521,10 +530,16 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def closeEvent(self, event) -> None:
-        """Clean up on window close."""
-        # Stop the async worker
-        if hasattr(self, "_worker"):
+        """Clean up on window close. Stops the async worker gracefully."""
+        # Stop the bulk-leave operation if running
+        self._leave_running = False
+        self._channel_manager.stop()
+
+        # Stop the async worker's event loop
+        if hasattr(self, "_worker") and self._worker.isRunning():
             self._worker.stop()
-            if not self._worker.wait(3000):
+            # Wait with timeout; if it doesn't finish, move on
+            if not self._worker.wait(2000):
                 self._worker.terminate()
-        super().closeEvent(event)
+                self._worker.wait(1000)
+        event.accept()
