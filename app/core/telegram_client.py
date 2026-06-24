@@ -125,24 +125,19 @@ class TelegramClientWrapper:
         self.auth_state = AuthState.NOT_AUTHENTICATED
 
     async def reset_session(self) -> None:
-        """Log out from Telegram server and destroy session data.
+        """Disconnect and destroy session data for fresh authorization.
 
-        1. Calls ``client.log_out()`` so the server invalidates the auth key
-        2. Deletes stale session files from disk (handles Windows locks)
-        3. Creates a fresh empty SQLiteSession for a clean QR login
+        Deletes session files from disk (handles Windows locks) and creates
+        a fresh empty SQLiteSession.  Does NOT call ``log_out()`` (which
+        makes the entire Telethon client unusable).  Relies on the Telegram
+        server to eventually expire the old auth key — the next QR login
+        will use a brand-new auth key.
 
         On the next ``start_with_session()`` the client will require QR /
         phone login because no auth data exists.
         """
-        # 1. Tell the server to invalidate this session (best-effort)
-        try:
-            await self.client.log_out()
-            logger.info("log_out() completed — server session invalidated")
-        except Exception as exc:
-            logger.warning("log_out() failed (ok if already stale): %s", exc)
-            await self.client.disconnect()
+        await self.client.disconnect()
 
-        # 2. Nuke any leftover session files (Windows may hold locks)
         session_base = get_session_path()
         for suffix in (".session", ".session-journal", ".session-wal", ".session-shm"):
             f = session_base + suffix
@@ -158,7 +153,6 @@ class TelegramClientWrapper:
                     logger.warning("Failed to delete %s: %s", f, exc)
                     break
 
-        # 3. Create fresh session (log_out sets session=None)
         try:
             self.client.session = SQLiteSession(self._session_path)
             logger.info("Created fresh empty SQLiteSession")
