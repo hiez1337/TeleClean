@@ -1,6 +1,9 @@
 # Environment variables
 .env
 
+# Embedded API keys (committed with placeholder; CI overwrites)
+app/core/api_keys.py
+
 # Telethon session files
 *.session
 
