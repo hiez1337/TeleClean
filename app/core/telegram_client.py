@@ -177,7 +177,13 @@ class TelegramClientWrapper:
         Returns True if already authorised.
         """
         await self.connect()
-        authorized = await self.is_user_authorized()
+        try:
+            authorized = await self.is_user_authorized()
+        except errors.AuthRestartError:
+            logger.warning("Auth key invalid, resetting session")
+            await self.reset_session()
+            await self.connect()
+            authorized = False
         logger.info(
             "start_with_session: is_user_authorized=%s, _authorized=%s, "
             "auth_key=%s",
@@ -201,6 +207,8 @@ class TelegramClientWrapper:
         a QR code, or None on failure.
         """
         try:
+            if not self.client.is_connected():
+                await self.client.connect()
             self._qr_login = await self.client.qr_login()
             self._last_qr_token = self._qr_login.token
             self.auth_state = AuthState.WAITING_FOR_QR_SCAN

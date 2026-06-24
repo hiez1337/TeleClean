@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any, Optional
 
@@ -16,15 +17,17 @@ logger = logging.getLogger(__name__)
 
 
 def get_data_dir() -> Path:
-    """Return the path to the app data directory (``.teleclean/``).
+    """Return the path to the app data directory.
 
-    Creates the directory if it does not exist.
-    Resolved by walking up from the known package path
-    ``app/services/session_service.py``.
+    Dev mode: ``<project-root>/.teleclean/``
+    Bundled .exe: ``%APPDATA%/TeleClean/`` (Windows) or ``~/.teleclean/``
     """
-    data_dir = Path(__file__).resolve().parent.parent.parent / ".teleclean"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir
+    if getattr(sys, 'frozen', False):
+        base = Path(os.environ.get('APPDATA', Path.home().as_posix())) / "TeleClean"
+    else:
+        base = Path(__file__).resolve().parent.parent.parent / ".teleclean"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
 
 
 def get_session_path(session_name: str = "teleclean") -> str:
