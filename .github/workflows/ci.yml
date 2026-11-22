@@ -16,8 +16,17 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - run: dotnet test src/TeleClean.Tests/TeleClean.Tests.csproj -c Release --logger trx
-      - run: dotnet build src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64
+      - name: Publish self-contained Windows executable
+        run: dotnet publish src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64 -p:PublishProfile=WinX64 --artifacts-path artifacts/single-file-build -o artifacts/publish
+      - name: Stage TeleClean.exe
+        shell: pwsh
+        run: |
+          if (@(Get-ChildItem -LiteralPath artifacts/publish -Recurse -File).Count -ne 1) {
+            throw 'Single-file publish produced unexpected sidecar files.'
+          }
+          Copy-Item -LiteralPath artifacts/publish/TeleClean.App.exe -Destination artifacts/TeleClean.exe
       - uses: actions/upload-artifact@v4
         with:
           name: TeleClean-win-x64
-          path: src/TeleClean.App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/
+          path: artifacts/TeleClean.exe
+          if-no-files-found: error
