@@ -1,25 +1,28 @@
-# TeleClean — WinUI agent guide
+# TeleClean · WinUI
 
-This branch contains C# only. Python / PySide6 / Telethon lives on `python`.
+Рабочая ветка WinUI содержит самостоятельный проект C#. Python, PySide6, Telethon и PyInstaller относятся к ветке `python`.
 
-## Architecture
-.NET 8, WinUI 3 (Windows App SDK 1.5), CommunityToolkit.Mvvm, WTelegramClient 4.4.8.
-`src/TeleClean.Core` holds models, Telegram, cache/config and sequential bulk engine.
-`src/TeleClean.App` uses singleton view models and DI; UI updates go through IDispatcherService.
-`src/TeleClean.Tests` contains offline xUnit business tests. `tests/` contains historical stress harnesses.
-Use `long` for peer identifiers. Never mix user/chat/channel identity namespaces.
+## Архитектура
 
-## Build and test (Windows x64, .NET 8 SDK and Windows SDK)
-```
+- `src/TeleClean.Core` содержит модели, WTelegramClient 4.4.8, конфигурацию, кэш и последовательный движок массовой обработки.
+- `src/TeleClean.App` использует .NET 8, WinUI 3 из Windows App SDK 1.5 и CommunityToolkit.Mvvm. Из фоновых задач обновляйте представления через `IDispatcherService`.
+- `src/TeleClean.Tests` содержит штатный набор xUnit с фейковыми сервисами. Проекты в корневом `tests/` служат историческими экспериментами и не участвуют в WinUI CI.
+
+Telegram ID хранится как `long`. Для сопоставления строк учитывайте тип вместе с ID. Для фотографий используйте `DialogItem.AvatarCacheKey`, разделяющий пространства пользователей, групп и каналов. Для дат сообщений сопоставляйте тип и ID собеседника вместе с ID сообщения.
+
+## Сборка и проверка
+
+Из корня checkout на Windows x64 с .NET 8 SDK и Windows SDK выполните:
+
+```powershell
 dotnet test src/TeleClean.Tests/TeleClean.Tests.csproj -c Release
 dotnet build src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64
 ```
-Run `src/TeleClean.App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/TeleClean.App.exe`.
-All required NuGet packages restore from nuget.org; no local package directory is required.
 
-## Safety and verification
-Preserve user session files and unrelated changes. Never test destructive operations against a real account.
-Tests use fake services. Keep automated business tests independent of GUI; manually inspect real WinUI screens in both themes.
-Never commit API credentials, session files, personal metadata, caches, logs or build output.
-Do not claim account integration or UI verification without actually running it.
-CI must test Core and build WinUI on Windows. Upload artifacts; do not automatically publish releases.
+Точка запуска: `src/TeleClean.App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/TeleClean.App.exe`. NuGet восстанавливает пакеты с nuget.org. Windows CI запускает xUnit и публикует архив сборки как артефакт.
+
+## Безопасная проверка UI
+
+Подменяйте `ITelegramService` в тестовой сборке и передавайте `ConfigService` отдельный временный каталог. Проверяйте светлую и тёмную темы, клавиатурный фокус, узкий режим навигации и отмену массовой операции. Описывайте, какие сценарии выполнены на фейковых данных и какие проверены только тестами или по коду.
+
+Сохраняйте пользовательские сессии и сторонние изменения. Исключайте из Git API-реквизиты, данные прокси, файлы сессий, метаданные аккаунтов, кэш, журналы и выходные файлы сборки.
