@@ -1,3 +1,7 @@
+# TeleClean · Python
+
+Самостоятельная версия Python / PySide6 / Telethon. WinUI: [ветка winui](https://github.com/hiez1337/TeleClean/tree/winui).
+
 # TeleClean
 
 ![Python](https://img.shields.io/badge/python-3.12-blue)
