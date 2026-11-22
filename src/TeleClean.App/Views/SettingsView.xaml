@@ -7,7 +7,7 @@
         <StackPanel Spacing="14" Padding="24,20" HorizontalAlignment="Stretch">
             <StackPanel Spacing="4">
                 <TextBlock Text="Настройки" Style="{StaticResource WorkspaceTitle}" AutomationProperties.HeadingLevel="Level1"/>
-                <TextBlock Text="Оформление, скорость запросов и подключение к Telegram." Style="{StaticResource SupportingText}"/>
+                <TextBlock Text="Тема, подключение и параметры обработки." Style="{StaticResource SupportingText}"/>
             </StackPanel>
             <InfoBar IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" Severity="Error"
                 Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" IsClosable="False"/>
@@ -52,7 +52,7 @@
             <Border Style="{StaticResource WorkspacePanel}" Padding="20">
                 <StackPanel Spacing="10">
                     <TextBlock Text="Данные и сессия" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
-                    <TextBlock Text="Выход из аккаунта завершит сессию TeleClean на этом устройстве." Style="{StaticResource SupportingText}"/>
+                    <TextBlock Text="Выход завершит текущую сессию TeleClean на этом устройстве." Style="{StaticResource SupportingText}"/>
                     <Button Content="Очистить кэш аватаров" Command="{x:Bind ViewModel.ClearAvatarCacheCommand}"/>
                     <Button Content="Выйти из аккаунта" Click="OnConfirmLogout"/>
                 </StackPanel>

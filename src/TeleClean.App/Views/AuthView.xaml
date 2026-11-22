@@ -12,7 +12,7 @@
                 </StackPanel>
                 <StackPanel Spacing="5">
                     <TextBlock Text="Подключите Telegram" Style="{StaticResource WorkspaceTitle}" TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1"/>
-                    <TextBlock Text="После входа вы сможете просмотреть диалоги и выбрать, какие из них убрать." Style="{StaticResource SupportingText}"/>
+                    <TextBlock Text="Сначала просмотрите диалоги. TeleClean покажет состав и последствия операции перед запуском." Style="{StaticResource SupportingText}"/>
                 </StackPanel>
                 <Border Style="{StaticResource WorkspacePanel}" Padding="20">
                     <StackPanel Spacing="12">
@@ -35,6 +35,7 @@
                                 <TextBlock Text="{x:Bind ViewModel.QrStatusText, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
                                 <Button Content="Обновить QR-код" Command="{x:Bind ViewModel.StartQrLoginCommand}"/>
                                 <Button Content="Войти по номеру телефона" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
+                                <HyperlinkButton Content="Настройки подключения" Click="OnProxySettingsClick" IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
                             </StackPanel>
                         </Grid>
                         <StackPanel Visibility="{x:Bind ViewModel.IsPhoneMode, Mode=OneWay}" Spacing="12">
@@ -44,6 +45,7 @@
                                 IsEnabled="{x:Bind ViewModel.IsPhoneInputEnabled, Mode=OneWay}"/>
                             <Button Content="Получить код" Command="{x:Bind ViewModel.SendPhoneCodeCommand}" Style="{ThemeResource AccentButtonStyle}"
                                 Visibility="{x:Bind ViewModel.IsSendCodeButtonVisible, Mode=OneWay}"/>
+                            <HyperlinkButton Content="Настройки подключения" Click="OnProxySettingsClick" IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
                             <StackPanel Visibility="{x:Bind ViewModel.IsCodeInputVisible, Mode=OneWay}" Spacing="10">
                                 <TextBox x:Name="CodeInput" Header="Код подтверждения" InputScope="Number"
                                     Text="{x:Bind ViewModel.PhoneCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
@@ -63,7 +65,6 @@
                                    Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}" AutomationProperties.LiveSetting="Polite"/>
                     </StackPanel>
                 </Border>
-                <Button Content="Настройки подключения" Click="OnProxySettingsClick" IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
             </StackPanel>
         </ScrollViewer>
     </Grid>

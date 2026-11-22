@@ -63,8 +63,8 @@ public sealed partial class DialogsView : Page
 
         bool delete = items[0].DialogType is DialogType.Bot or DialogType.Deleted or DialogType.User;
         var consequence = delete
-            ? "История будет удалена из вашего списка Telegram. Боты не будут заблокированы."
-            : "Вы потеряете доступ к закрытым каналам и чатам без нового приглашения.";
+            ? "История будет удалена из вашего списка Telegram. Бот останется доступен для новых сообщений."
+            : "Чтобы вернуться в закрытый канал или чат, потребуется новое приглашение.";
         var preview = string.Join("\n", items.Take(4).Select(item => "• " + item.Title));
         if (items.Count > 4) preview += $"\nИ ещё {items.Count - 4}.";
 

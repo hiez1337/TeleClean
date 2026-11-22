@@ -8,7 +8,15 @@
             <TextBlock Text="Операции" Style="{StaticResource WorkspaceTitle}" AutomationProperties.HeadingLevel="Level1"/>
             <TextBlock Text="Ход обработки и результаты последней операции." Style="{StaticResource SupportingText}"/>
         </StackPanel>
-        <Border Grid.Row="1" Style="{StaticResource WorkspacePanel}" Padding="16">
+        <Border Grid.Row="1" Style="{StaticResource WorkspacePanel}" Padding="16"
+                Visibility="{x:Bind ViewModel.HasStarted, Converter={StaticResource InvertedBoolToVis}, Mode=OneWay}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Операций пока нет" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                <TextBlock Text="Выберите диалоги в списке и проверьте состав операции перед запуском." Style="{StaticResource SupportingText}"/>
+                <Button Content="К списку диалогов" Click="OnReturnToDialogs"/>
+            </StackPanel>
+        </Border>
+        <Border Grid.Row="1" Visibility="{x:Bind ViewModel.HasStarted, Mode=OneWay}" Style="{StaticResource WorkspacePanel}" Padding="16">
             <StackPanel Spacing="9">
                 <TextBlock Text="{x:Bind ViewModel.StateBadgeText, Mode=OneWay}" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                 <TextBlock Text="{x:Bind ViewModel.CurrentStatusDescription, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
@@ -21,10 +29,11 @@
                     <Button Content="{x:Bind ViewModel.PauseButtonText, Mode=OneWay}" Command="{x:Bind ViewModel.TogglePauseCommand}"
                             IsEnabled="{x:Bind ViewModel.CanTogglePause, Mode=OneWay}"/>
                     <Button Content="Остановить" Command="{x:Bind ViewModel.StopCommand}" IsEnabled="{x:Bind ViewModel.CanStop, Mode=OneWay}"/>
+                    <Button Content="К списку" Click="OnReturnToDialogs"/>
                 </StackPanel>
             </StackPanel>
         </Border>
-        <Border Grid.Row="2" Style="{StaticResource WorkspacePanel}" Padding="12">
+        <Border Grid.Row="2" Visibility="{x:Bind ViewModel.HasStarted, Mode=OneWay}" Style="{StaticResource WorkspacePanel}" Padding="12">
             <Grid RowSpacing="8">
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="12">

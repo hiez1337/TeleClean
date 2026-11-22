@@ -47,6 +47,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     public bool HasRequestedDialogs { get; private set; }
     public bool CanRefresh => !IsBusy && !_operationActive;
+    public bool CanSelectVisible => CanSelect && VisibleDialogs.Any(dialog => dialog.IsJoined);
     public bool CanSelect => _hasFreshDialogs && CanRefresh;
     public bool HasFilters => !string.IsNullOrWhiteSpace(SearchQuery) || SelectedFilterIndex != 0;
     public bool ShowEmpty => !IsBusy && VisibleDialogs.Count == 0 && ErrorMessage == null;
@@ -98,7 +99,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
     private string _selectionCounterText = "Выбрано: 0 из 0";
 
     [ObservableProperty]
-    private string _actionButtonText = "Выйти из выбранных";
+    private string _actionButtonText = "Проверить выбор";
 
     [ObservableProperty]
     private bool _canExecuteAction;
@@ -298,7 +299,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
             var remote = await _telegramService.FetchDialogsAsync();
             SetDialogs(remote);
             _hasFreshDialogs = true;
-            StatusMessage = $"Синхронизировано диалогов: {remote.Count}.";
+            StatusMessage = "Список обновлён";
             await PersistDialogsAsync();
 
             _avatarLoad = new CancellationTokenSource();
@@ -495,6 +496,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
         LeftCount = leftInCurrentView;
         CanExecuteAction = CanSelect && selectedInCurrentView > 0;
         OnPropertyChanged(nameof(CanSelect));
+        OnPropertyChanged(nameof(CanSelectVisible));
         OnPropertyChanged(nameof(CanRefresh));
         OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(HasFilters));
@@ -502,28 +504,11 @@ public sealed partial class DialogListViewModel : ViewModelBase
         OnPropertyChanged(nameof(EmptyHint));
 
         SelectionCounterText = $"Выбрано: {selectedInCurrentView} из {totalInCurrentView}" +
-            (leftInCurrentView > 0 ? $" | Вышло: {leftInCurrentView}" : "");
+            (leftInCurrentView > 0 ? $" · Обработано: {leftInCurrentView}" : "");
 
-        var category = CurrentCategory;
-        if (selectedInCurrentView == 0)
-        {
-            ActionButtonText = category switch
-            {
-                DialogCategoryTab.Deleted => "Удалить выбранные",
-                DialogCategoryTab.Bots => "Удалить диалоги",
-                _ => "Выйти из выбранных"
-            };
-        }
-        else
-        {
-            ActionButtonText = category switch
-            {
-                DialogCategoryTab.Deleted => $"Удалить {selectedInCurrentView} {GetRussianPlural(selectedInCurrentView, "диалог", "диалога", "диалогов")}",
-                DialogCategoryTab.Bots => $"Удалить диалоги ({selectedInCurrentView})",
-                DialogCategoryTab.Chats => $"Выйти из чатов ({selectedInCurrentView})",
-                _ => $"Выйти из каналов ({selectedInCurrentView})"
-            };
-        }
+        ActionButtonText = selectedInCurrentView > 0
+            ? $"Проверить выбор ({selectedInCurrentView})"
+            : "Проверить выбор";
 
         OnPropertyChanged(nameof(BottomStatusBarText));
         OnPropertyChanged(nameof(CurrentCategoryTitleWithCount));
