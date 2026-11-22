@@ -6,7 +6,11 @@
 - [Технический аудит](docs/winui-audit.md)
 - [Отдельная версия Python / PySide6](https://github.com/hiez1337/TeleClean/tree/python)
 
-## Сборка и запуск
+## Скачать и запустить
+
+Откройте последний успешный [запуск Actions ветки winui](https://github.com/hiez1337/TeleClean/actions?query=branch%3Awinui) и скачайте артефакт `TeleClean-win-x64`. Извлеките из ZIP один файл `TeleClean.exe` и запустите его на Windows x64. .NET и WinUI входят в сборку. При первом запуске приложение распаковывает библиотеки в временную папку пользователя.
+
+## Сборка из исходников
 
 Понадобятся Windows 10 19041+ или Windows 11, .NET 8 SDK и Windows SDK. Зависимости восстанавливаются с NuGet.org.
 
@@ -16,7 +20,14 @@ dotnet build src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64
 .\src\TeleClean.App\bin\x64\Release\net8.0-windows10.0.19041.0\win-x64\TeleClean.App.exe
 ```
 
-WinUI CI выполняет офлайн-тесты и собирает Windows x64. Архив `TeleClean-win-x64` доступен в последнем успешном [запуске Actions ветки winui](https://github.com/hiez1337/TeleClean/actions?query=branch%3Awinui). Распакуйте архив и запустите `TeleClean.App.exe`.
+Для публикации одного EXE используйте профиль `WinX64`:
+
+```powershell
+dotnet publish src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64 -p:PublishProfile=WinX64 -p:DebugType=none --artifacts-path artifacts/single-file-build -o artifacts/publish
+Copy-Item artifacts/publish/TeleClean.App.exe artifacts/TeleClean.exe
+```
+
+Каталог `artifacts/single-file-build` отделяет промежуточные файлы публикации от обычной сборки WinUI.
 
 ## Работа с диалогами
 

@@ -25,7 +25,7 @@ dotnet test src/TeleClean.Tests/TeleClean.Tests.csproj -c Release
 dotnet build src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64
 ```
 
-Точка запуска: `src/TeleClean.App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/TeleClean.App.exe`. NuGet восстанавливает пакеты с nuget.org. Windows CI запускает xUnit и публикует архив сборки как артефакт.
+Точка запуска: `src/TeleClean.App/bin/x64/Release/net8.0-windows10.0.19041.0/win-x64/TeleClean.App.exe`. NuGet восстанавливает пакеты с nuget.org. Windows CI запускает xUnit и публикует один файл `TeleClean.exe` в артефакте `TeleClean-win-x64`. Для выпуска используйте профиль `WinX64` и проверяйте запуск EXE из пустой папки.
 
 ## Безопасная проверка UI
 
