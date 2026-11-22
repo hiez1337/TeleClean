@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -135,7 +136,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
             try
             {
                 string result = await _telegramService.BeginLoginWithQrAsync(
-                    qrUrl => _ = HandleQrUrlGeneratedAsync(qrUrl, ct),
+                    qrUrl => HandleQrUrlGenerated(qrUrl, ct),
                     onPasswordNeeded: () =>
                     {
                         Dispatcher.Enqueue(() =>
@@ -192,41 +193,30 @@ public sealed partial class AuthViewModel : ViewModelBase,
         });
     }
 
-    private async Task HandleQrUrlGeneratedAsync(string qrUrl, CancellationToken ct)
+    private void HandleQrUrlGenerated(string qrUrl, CancellationToken ct)
     {
-        try
+        if (ct.IsCancellationRequested) return;
+        var pixels = QrCodeRenderer.GenerateBgraPixels(qrUrl, out var width, out var height);
+        Dispatcher.Enqueue(() =>
         {
-            using var softwareBitmap = QrCodeRenderer.GenerateSoftwareBitmap(qrUrl, pixelsPerModule: 8, quietZoneModules: 4);
-
-            await Dispatcher.EnqueueAsync(async () =>
+            if (ct.IsCancellationRequested) return;
+            try
             {
-                try
-                {
-                    if (ct.IsCancellationRequested) return;
-                    var source = new SoftwareBitmapSource();
-                    await source.SetBitmapAsync(softwareBitmap);
-                    if (ct.IsCancellationRequested) return;
-                    QrCodeImage = source;
-                    IsQrLoading = false;
-                    QrStatusText = "QR-код готов к сканированию.";
-                }
-                catch
-                {
-                    // Fallback in headless/mock test mode
-                    IsQrLoading = false;
-                    QrStatusText = "QR-код готов к сканированию.";
-                }
-            });
-        }
-        catch (Exception)
-        {
-            Dispatcher.Enqueue(() =>
-            {
-                if (ct.IsCancellationRequested) return;
+                var source = new WriteableBitmap(width, height);
+                using var stream = source.PixelBuffer.AsStream();
+                stream.Write(pixels);
+                source.Invalidate();
+                QrCodeImage = source;
                 IsQrLoading = false;
-                ErrorMessage = "Не удалось показать QR-код. Обновите код или войдите по телефону.";
-            });
-        }
+                QrStatusText = "QR-код готов к сканированию.";
+            }
+            catch
+            {
+                IsQrLoading = false;
+                QrStatusText = "Обновите QR-код или войдите по телефону.";
+                ErrorMessage = "Не удалось показать QR-код.";
+            }
+        });
     }
 
     [RelayCommand]

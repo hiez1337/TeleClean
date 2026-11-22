@@ -31,8 +31,10 @@
                     SelectedIndex="{x:Bind ViewModel.SelectedSortIndex, Mode=TwoWay}"/>
                 <Button Grid.Column="2" VerticalAlignment="Bottom" Command="{x:Bind ViewModel.LoadDialogsCommand}"
                     IsEnabled="{x:Bind ViewModel.CanRefresh, Mode=OneWay}" AutomationProperties.Name="Обновить список" ToolTipService.ToolTip="Обновить список">
-                    <FontIcon Glyph="&#xE72C;" FontSize="16"/>
-                    <Button.KeyboardAccelerators><KeyboardAccelerator Key="F5"/></Button.KeyboardAccelerators>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                        <TextBlock Text="Обновить"/>
+                    </StackPanel>
                 </Button>
             </Grid>
         </StackPanel>
@@ -55,6 +57,7 @@
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="0"/>
+                            <Setter Property="AutomationProperties.Name" Value="{Binding Title}"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         </Style>
                     </ListView.ItemContainerStyle>

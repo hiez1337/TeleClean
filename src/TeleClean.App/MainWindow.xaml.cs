@@ -8,6 +8,7 @@ using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Input;
 using TeleClean.App.Messages;
 using TeleClean.App.ViewModels;
 using TeleClean.App.Views;
@@ -45,6 +46,7 @@ public sealed partial class MainWindow : Window,
 
         WeakReferenceMessenger.Default.RegisterAll(this);
         var config = App.Services.GetRequiredService<IConfigService>().CurrentConfig;
+        RootGrid.ActualThemeChanged += (_, _) => UpdateTitleBarTheme();
         SetAppTheme(config.Theme);
         SetBackdrop(config.Backdrop);
     }
@@ -52,12 +54,41 @@ public sealed partial class MainWindow : Window,
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr window);
 
-    public void SetAppTheme(string theme) => RootGrid.RequestedTheme = theme?.ToLowerInvariant() switch
+    public void SetAppTheme(string theme)
     {
-        "light" => ElementTheme.Light,
-        "dark" => ElementTheme.Dark,
-        _ => ElementTheme.Default
-    };
+        RootGrid.RequestedTheme = theme?.ToLowerInvariant() switch
+        {
+            "light" => ElementTheme.Light,
+            "dark" => ElementTheme.Dark,
+            _ => ElementTheme.Default
+        };
+        UpdateTitleBarTheme();
+    }
+
+    private void UpdateTitleBarTheme()
+    {
+        // Preserve the system caption buttons and window behavior.
+        int dark = RootGrid.ActualTheme == ElementTheme.Dark ? 1 : 0;
+        _ = DwmSetWindowAttribute(WindowNative.GetWindowHandle(this), 20, ref dark, sizeof(int));
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr window, uint attribute, ref int value, int size);
+
+    private void OnNavigationDisplayModeChanged(NavigationView sender, NavigationViewDisplayModeChangedEventArgs args)
+    {
+        sender.IsPaneOpen = args.DisplayMode == NavigationViewDisplayMode.Expanded;
+        if (ContentFrame != null)
+            ContentFrame.Margin = args.DisplayMode == NavigationViewDisplayMode.Minimal
+                ? new Thickness(0, 48, 0, 0) : new Thickness(0);
+    }
+
+    private async void OnRefreshShortcut(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (Navigation.Visibility != Visibility.Visible || ContentFrame.Content is not DialogsView) return;
+        args.Handled = true;
+        await DialogListVm.LoadDialogsAsync();
+    }
 
     public void SetBackdrop(string backdropType) => SystemBackdrop = backdropType switch
     {

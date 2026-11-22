@@ -4,10 +4,13 @@
     xmlns:views="using:TeleClean.App.Views" Title="TeleClean">
     <Window.SystemBackdrop><MicaBackdrop Kind="Base"/></Window.SystemBackdrop>
     <Grid x:Name="RootGrid">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="F5" Invoked="OnRefreshShortcut"/>
+        </Grid.KeyboardAccelerators>
         <NavigationView x:Name="Navigation" Visibility="Collapsed"
             PaneDisplayMode="Auto" ExpandedModeThresholdWidth="900" CompactModeThresholdWidth="660"
             OpenPaneLength="224" IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
-            SelectionChanged="OnNavigationChanged">
+            DisplayModeChanged="OnNavigationDisplayModeChanged" SelectionChanged="OnNavigationChanged">
             <NavigationView.PaneHeader>
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="12,0,0,0">
                     <Border Background="{ThemeResource BrandBrush}" Width="32" Height="32" CornerRadius="9">
