@@ -543,7 +543,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
 
             if (!IsAuthorized)
             {
-                var ok = await _client!.LoginUserIfNeeded();
+                var ok = await _client!.LoginUserIfNeeded(reloginOnFailedResume: false);
                 if (ok == null)
                 {
                     throw new InvalidOperationException("Telegram client is not authorized.");
@@ -713,7 +713,8 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 case DialogType.User:
                 case DialogType.Deleted:
                     var inputPeer = new TL.InputPeerUser(dialog.Id, dialog.AccessHash);
-                    await _client!.Messages_DeleteHistory(inputPeer, max_id: 0, just_clear: false, revoke: false);
+                    await CompleteHistoryDeletionAsync(
+                        () => _client!.Messages_DeleteHistory(inputPeer, max_id: 0, just_clear: false, revoke: false), ct);
                     dialog.IsJoined = false;
                     return LeaveResult.Success;
 
@@ -770,16 +771,13 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 return null;
             }
 
-            var dialog = Array.Find(_cachedDialogs.dialogs, d => d.Peer.ID == item.Id && (d.Peer switch
+            Peer peer = item.DialogType switch
             {
-                PeerChannel => item.DialogType is DialogType.Channel or DialogType.Supergroup,
-                PeerChat => item.DialogType == DialogType.Group,
-                PeerUser => item.DialogType is DialogType.User or DialogType.Bot or DialogType.Deleted,
-                _ => false
-            }));
-            if (dialog == null) return null;
-
-            var peerInfo = _cachedDialogs.UserOrChat(dialog.Peer);
+                DialogType.Channel or DialogType.Supergroup => new PeerChannel { channel_id = item.Id },
+                DialogType.Group => new PeerChat { chat_id = item.Id },
+                _ => new PeerUser { user_id = item.Id }
+            };
+            var peerInfo = _cachedDialogs.UserOrChat(peer);
             if (peerInfo == null) return null;
 
             using var ms = new MemoryStream();
@@ -792,6 +790,10 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
 
             return null;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch
         {
             return null;
@@ -800,6 +802,18 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         {
             _clientLock.Release();
         }
+    }
+
+    internal static async Task CompleteHistoryDeletionAsync(
+        Func<Task<Messages_AffectedHistory>> deleteBatch, CancellationToken ct)
+    {
+        // Telegram may delete a long history in parts. Do not report success before the final batch.
+        Messages_AffectedHistory affected;
+        do
+        {
+            ct.ThrowIfCancellationRequested();
+            affected = await deleteBatch();
+        } while (affected.offset > 0);
     }
 
     public ValueTask DisposeAsync()

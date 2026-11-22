@@ -18,12 +18,12 @@ public interface ICacheService
     Task SaveDialogCacheAsync(IEnumerable<DialogItem> dialogs, CancellationToken ct = default);
 
     /// <summary>
-    /// Loads bulk execution history from leave_history.json.
+    /// Loads bulk execution history from the legacy JSON history and the append-only JSONL journal.
     /// </summary>
     Task<IReadOnlyList<BulkLogEntry>> LoadHistoryAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Appends a new log entry to leave_history.json.
+    /// Appends a new log entry to the append-only leave_history.jsonl journal.
     /// </summary>
     Task AppendHistoryAsync(BulkLogEntry entry, CancellationToken ct = default);
 

@@ -23,6 +23,8 @@ public sealed class CacheService : ICacheService
 
     private string GetDialogCachePath() => Path.Combine(GetCacheDirectory(), "channel_cache.json");
 
+    private string GetHistoryJournalPath() => Path.Combine(GetCacheDirectory(), "leave_history.jsonl");
+
     private string GetHistoryPath() => Path.Combine(GetCacheDirectory(), "leave_history.json");
 
     private string GetAvatarsDirectory()
@@ -63,7 +65,7 @@ public sealed class CacheService : ICacheService
 
             return items ?? (IReadOnlyList<DialogItem>)Array.Empty<DialogItem>();
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
             return Array.Empty<DialogItem>();
         }
@@ -92,7 +94,7 @@ public sealed class CacheService : ICacheService
                 WriteIndented = true
             });
 
-            await File.WriteAllTextAsync(path, json, ct);
+            await AtomicFile.WriteTextAsync(path, json, ct);
         }
         finally
         {
@@ -103,6 +105,34 @@ public sealed class CacheService : ICacheService
     public async Task<IReadOnlyList<BulkLogEntry>> LoadHistoryAsync(CancellationToken ct = default)
     {
         await _historyLock.WaitAsync(ct);
+        try
+        {
+            var result = (await LoadLegacyHistoryAsync(ct)).ToList();
+            var path = GetHistoryJournalPath();
+            if (!File.Exists(path)) return result;
+
+            using var reader = new StreamReader(path);
+            while (await reader.ReadLineAsync(ct) is { } line)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
+                {
+                    var entry = JsonSerializer.Deserialize<BulkLogEntry>(line);
+                    if (entry != null) result.Add(entry);
+                }
+                catch (JsonException)
+                {
+                    // A partial last write must not hide preceding or subsequent complete records.
+                }
+            }
+            return result;
+        }
+        finally { _historyLock.Release(); }
+    }
+
+    private async Task<IReadOnlyList<BulkLogEntry>> LoadLegacyHistoryAsync(CancellationToken ct = default)
+    {
         try
         {
             var path = GetHistoryPath();
@@ -126,108 +156,69 @@ public sealed class CacheService : ICacheService
             var results = new List<BulkLogEntry>();
             foreach (var elem in doc.RootElement.EnumerateArray())
             {
-                if (elem.TryGetProperty("dialog_id", out _) || elem.TryGetProperty("dialogId", out _))
+                ct.ThrowIfCancellationRequested();
+                try
                 {
-                    var item = JsonSerializer.Deserialize<BulkLogEntry>(elem.GetRawText(), new JsonSerializerOptions
+                    if (elem.TryGetProperty("dialog_id", out _) || elem.TryGetProperty("dialogId", out _))
                     {
-                        PropertyNameCaseInsensitive = true
-                    });
-                    if (item != null) results.Add(item);
-                }
-                else if (elem.TryGetProperty("started_at", out var startedAtProp))
-                {
-                    double timestampSeconds = startedAtProp.GetDouble();
-                    var time = DateTimeOffset.FromUnixTimeMilliseconds((long)(timestampSeconds * 1000)).UtcDateTime;
-                    int total = elem.TryGetProperty("total", out var tp) ? tp.GetInt32() : 0;
-                    int success = elem.TryGetProperty("success", out var sp) ? sp.GetInt32() : 0;
-
-                    if (elem.TryGetProperty("errors", out var errorsElem) && errorsElem.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var err in errorsElem.EnumerateArray())
+                        var item = JsonSerializer.Deserialize<BulkLogEntry>(elem.GetRawText(), new JsonSerializerOptions
                         {
-                            long chId = err.TryGetProperty("channel_id", out var chIdProp) ? chIdProp.GetInt64() : 0;
-                            string chTitle = err.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? string.Empty : string.Empty;
-                            string errStr = err.TryGetProperty("error", out var errProp) ? errProp.GetString() ?? string.Empty : string.Empty;
-                            var res = string.Equals(errStr, "rate_limited", StringComparison.OrdinalIgnoreCase) ? LeaveResult.RateLimited : LeaveResult.Error;
-                            results.Add(new BulkLogEntry(time, chId, chTitle, res, errStr));
+                            PropertyNameCaseInsensitive = true
+                        });
+                        if (item != null)
+                        {
+                            if (elem.TryGetProperty("dialogId", out var camelId)) item.DialogId = camelId.GetInt64();
+                            results.Add(item);
                         }
                     }
+                    else if (elem.TryGetProperty("started_at", out var startedAtProp))
+                    {
+                        double timestampSeconds = startedAtProp.GetDouble();
+                        var time = DateTimeOffset.FromUnixTimeMilliseconds((long)(timestampSeconds * 1000)).UtcDateTime;
+                        int total = elem.TryGetProperty("total", out var tp) ? tp.GetInt32() : 0;
+                        int success = elem.TryGetProperty("success", out var sp) ? sp.GetInt32() : 0;
 
-                    results.Add(new BulkLogEntry(time, 0, "Сессия", LeaveResult.Success, $"Всего: {total}, Успешно: {success}"));
+                        if (elem.TryGetProperty("errors", out var errorsElem) && errorsElem.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var err in errorsElem.EnumerateArray())
+                            {
+                                long chId = err.TryGetProperty("channel_id", out var chIdProp) ? chIdProp.GetInt64() : 0;
+                                string chTitle = err.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? string.Empty : string.Empty;
+                                string errStr = err.TryGetProperty("error", out var errProp) ? errProp.GetString() ?? string.Empty : string.Empty;
+                                var res = string.Equals(errStr, "rate_limited", StringComparison.OrdinalIgnoreCase) ? LeaveResult.RateLimited : LeaveResult.Error;
+                                results.Add(new BulkLogEntry(time, chId, chTitle, res, errStr));
+                            }
+                        }
+
+                        results.Add(new BulkLogEntry(time, 0, "Сессия", LeaveResult.Success, $"Всего: {total}, Успешно: {success}"));
+                    }
+                }
+                catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or ArgumentOutOfRangeException)
+                {
+                    // Preserve readable legacy entries even if another record has incompatible fields.
                 }
             }
 
             return results;
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
             return Array.Empty<BulkLogEntry>();
-        }
-        finally
-        {
-            _historyLock.Release();
         }
     }
 
     public async Task AppendHistoryAsync(BulkLogEntry entry, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(entry);
-
+        var record = JsonSerializer.Serialize(entry);
         await _historyLock.WaitAsync(ct);
         try
         {
-            var path = GetHistoryPath();
-            var list = new List<BulkLogEntry>();
-
-            if (File.Exists(path))
-            {
-                try
-                {
-                    var existingJson = await File.ReadAllTextAsync(path, ct);
-                    if (!string.IsNullOrWhiteSpace(existingJson))
-                    {
-                        using var doc = JsonDocument.Parse(existingJson);
-                        if (doc.RootElement.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var elem in doc.RootElement.EnumerateArray())
-                            {
-                                if (elem.TryGetProperty("dialog_id", out _) || elem.TryGetProperty("dialogId", out _))
-                                {
-                                    var item = JsonSerializer.Deserialize<BulkLogEntry>(elem.GetRawText(), new JsonSerializerOptions
-                                    {
-                                        PropertyNameCaseInsensitive = true
-                                    });
-                                    if (item != null) list.Add(item);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch
-                {
-                    // If existing file is corrupt, start fresh
-                }
-            }
-
-            list.Add(entry);
-
-            var dir = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            var json = JsonSerializer.Serialize(list, new JsonSerializerOptions
-            {
-                WriteIndented = true
-            });
-
-            await File.WriteAllTextAsync(path, json, ct);
+            Directory.CreateDirectory(GetCacheDirectory());
+            // The leading newline isolates any partial record left by an interrupted process.
+            await File.AppendAllTextAsync(GetHistoryJournalPath(), "\n" + record + "\n", ct);
         }
-        finally
-        {
-            _historyLock.Release();
-        }
+        finally { _historyLock.Release(); }
     }
 
     public string GetAvatarPath(long dialogId)
@@ -237,7 +228,11 @@ public sealed class CacheService : ICacheService
 
     public bool HasAvatar(long dialogId)
     {
-        var path = GetAvatarPath(dialogId);
+        return IsValidAvatar(GetAvatarPath(dialogId));
+    }
+
+    private static bool IsValidAvatar(string path)
+    {
         if (!File.Exists(path))
         {
             return false;
@@ -294,23 +289,26 @@ public sealed class CacheService : ICacheService
         }
 
         await _avatarLock.WaitAsync(ct);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            using (var fileStream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+            await using (var fileStream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                bufferSize: 81920, useAsync: true))
             {
                 await stream.CopyToAsync(fileStream, ct);
             }
 
-            if (!HasAvatar(dialogId))
-            {
+            if (!IsValidAvatar(temporary))
                 throw new InvalidOperationException($"Saved avatar for {dialogId} failed integrity validation.");
-            }
 
+            ct.ThrowIfCancellationRequested();
+            File.Move(temporary, path, overwrite: true);
             return path;
         }
         finally
         {
             _avatarLock.Release();
+            File.Delete(temporary);
         }
     }
 

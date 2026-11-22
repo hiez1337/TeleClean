@@ -1,6 +1,5 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
-using Microsoft.UI.Xaml.Media;
 using TeleClean.Core.Models;
 
 namespace TeleClean.App.ViewModels;
@@ -141,9 +140,6 @@ public sealed partial class DialogItemViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _avatarLocalPath;
-
-    [ObservableProperty]
-    private ImageSource? _avatarImage;
 
     public event Action<DialogItemViewModel>? SelectionChanged;
 

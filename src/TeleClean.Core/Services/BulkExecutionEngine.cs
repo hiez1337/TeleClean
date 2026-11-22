@@ -17,6 +17,7 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
     private volatile bool _isStopped;
     private volatile bool _isPaused;
     private bool _isRunning;
+    private CancellationTokenSource? _stopSignal;
     private int _processed;
     private int _total;
     private string _title = string.Empty;
@@ -72,18 +73,23 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
     {
         ArgumentNullException.ThrowIfNull(items);
 
-        var list = items.ToList();
+        ArgumentOutOfRangeException.ThrowIfLessThan(delayBetween, TimeSpan.Zero);
+        ArgumentOutOfRangeException.ThrowIfLessThan(rateLimitDelay, TimeSpan.Zero);
+        var list = items.Where(item => item.IsJoined).DistinctBy(item => (item.DialogType, item.Id)).ToList();
         lock (_stateLock)
         {
             if (_isRunning)
                 throw new InvalidOperationException("A bulk operation is already in progress.");
 
+            _stopSignal = new CancellationTokenSource();
             _isRunning = true;
             _state = BulkOperationState.Running;
             _isStopped = false;
             _isPaused = false;
         }
 
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, _stopSignal.Token);
+        var waitToken = waitCancellation.Token;
         _total = list.Count;
         _processed = _succeeded = _failed = 0;
         _title = string.Empty;
@@ -94,7 +100,7 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
             for (int i = 0; i < _total; i++)
             {
                 while (_isPaused && !_isStopped)
-                    await Task.Delay(100, ct);
+                    await Task.Delay(100, waitToken);
                 if (_isStopped) break;
                 ct.ThrowIfCancellationRequested();
 
@@ -142,7 +148,7 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
                     for (int seconds = (int)Math.Max(1, wait); seconds > 0 && !_isStopped; seconds--)
                     {
                         Publish(seconds);
-                        await Task.Delay(1000, ct);
+                        await Task.Delay(1000, waitToken);
                     }
 
                     if (!_isStopped) State = _isPaused ? BulkOperationState.Paused : BulkOperationState.Running;
@@ -151,13 +157,13 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
                 {
                     Publish();
                     if (i < _total - 1 && !_isStopped)
-                        await Task.Delay(delayBetween, ct);
+                        await Task.Delay(delayBetween, waitToken);
                 }
             }
 
             completed = !_isStopped && !ct.IsCancellationRequested;
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (_isStopped || ct.IsCancellationRequested)
         {
             // Record the completed prefix even when the user stops during a wait.
         }
@@ -178,7 +184,12 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
             }
             finally
             {
-                lock (_stateLock) _isRunning = false;
+                lock (_stateLock)
+                {
+                    _isRunning = false;
+                    _stopSignal.Dispose();
+                    _stopSignal = null;
+                }
             }
         }
     }
@@ -215,6 +226,7 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
         {
             if (!_isRunning) return;
             _isStopped = true;
+            _stopSignal?.Cancel();
             _isPaused = false;
         }
     }

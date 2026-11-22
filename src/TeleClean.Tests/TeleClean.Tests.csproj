@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
@@ -24,4 +25,11 @@
     <ProjectReference Include="..\TeleClean.Core\TeleClean.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../TeleClean.App/ViewModels/ViewModelBase.cs" Link="Production/ViewModelBase.cs" />
+    <Compile Include="../TeleClean.App/ViewModels/DialogItemViewModel.cs" Link="Production/DialogItemViewModel.cs" />
+    <Compile Include="../TeleClean.App/ViewModels/DialogListViewModel.cs" Link="Production/DialogListViewModel.cs" />
+    <Compile Include="../TeleClean.App/Services/IDispatcherService.cs" Link="Production/IDispatcherService.cs" />
+    <Compile Include="../TeleClean.App/Messages/Messages.cs" Link="Production/Messages.cs" />
+  </ItemGroup>
 </Project>
