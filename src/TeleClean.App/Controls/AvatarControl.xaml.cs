@@ -2,25 +2,12 @@ using System;
 using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
-using Windows.UI;
 
 namespace TeleClean.App.Controls;
 
 public sealed partial class AvatarControl : UserControl
 {
-    private static readonly Color[] TelegramPalette =
-    [
-        Color.FromArgb(255, 231, 76, 60),   // Red
-        Color.FromArgb(255, 230, 126, 34),  // Orange
-        Color.FromArgb(255, 155, 89, 182),  // Violet
-        Color.FromArgb(255, 46, 204, 113),  // Green
-        Color.FromArgb(255, 26, 188, 156),  // Cyan
-        Color.FromArgb(255, 41, 144, 255),  // Blue
-        Color.FromArgb(255, 233, 30, 99)    // Pink
-    ];
-
     public static readonly DependencyProperty TitleProperty =
         DependencyProperty.Register(nameof(Title), typeof(string), typeof(AvatarControl), new PropertyMetadata(string.Empty, OnDataChanged));
 
@@ -71,14 +58,10 @@ public sealed partial class AvatarControl : UserControl
 
     private void UpdateVisuals()
     {
-        // 1. Initial calculation and color selection
+        // Keep the initials visible until an image is available.
         string title = Title ?? string.Empty;
-        string initial = !string.IsNullOrWhiteSpace(title) ? title.TrimStart()[0].ToString().ToUpperInvariant() : "?";
+        string initial = !string.IsNullOrWhiteSpace(title) ? System.Globalization.StringInfo.GetNextTextElement(title.TrimStart()).ToUpperInvariant() : "?";
         InitialsText.Text = initial;
-
-        uint hash = (uint)Math.Abs(title.GetHashCode());
-        Color circleColor = TelegramPalette[hash % (uint)TelegramPalette.Length];
-        FallbackCircle.Fill = new SolidColorBrush(circleColor);
 
         // 2. Corrupted file guard and disk image loading
         if (!string.IsNullOrWhiteSpace(AvatarPath) && File.Exists(AvatarPath))
@@ -88,7 +71,7 @@ public sealed partial class AvatarControl : UserControl
                 var fileInfo = new FileInfo(AvatarPath);
                 if (fileInfo.Length > 0)
                 {
-                    var bitmap = new BitmapImage(new Uri(AvatarPath));
+                    var bitmap = new BitmapImage(new Uri(AvatarPath)) { DecodePixelWidth = 96 };
                     AvatarImageBrush.ImageSource = bitmap;
                     ImageCircle.Visibility = Visibility.Visible;
                     FallbackCircle.Visibility = Visibility.Collapsed;
@@ -102,6 +85,7 @@ public sealed partial class AvatarControl : UserControl
             }
         }
 
+        AvatarImageBrush.ImageSource = null;
         ImageCircle.Visibility = Visibility.Collapsed;
         FallbackCircle.Visibility = Visibility.Visible;
         InitialsText.Visibility = Visibility.Visible;

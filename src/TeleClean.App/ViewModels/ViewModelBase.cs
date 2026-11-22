@@ -12,7 +12,10 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
     protected readonly IDispatcherService Dispatcher;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsReady))]
     private bool _isBusy;
+
+    public bool IsReady => !IsBusy;
 
     [ObservableProperty]
     private string? _errorMessage;

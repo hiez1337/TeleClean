@@ -28,26 +28,47 @@ public sealed partial class DialogListViewModel : ViewModelBase
     private readonly ICacheService _cacheService;
     private readonly IBulkExecutionEngine _engine;
     private readonly List<DialogItemViewModel> _allDialogs = new();
+    private CancellationTokenSource? _avatarLoad;
+    private bool _hasFreshDialogs;
+    private bool _operationActive;
 
-    public ObservableCollection<DialogItemViewModel> VisibleDialogs { get; } = new();
+    public bool HasRequestedDialogs { get; private set; }
+    public bool CanRefresh => !IsBusy && !_operationActive;
+    public bool CanSelect => _hasFreshDialogs && CanRefresh;
+    public bool HasFilters => !string.IsNullOrWhiteSpace(SearchQuery) || SelectedFilterIndex != 0;
+    public bool ShowEmpty => !IsBusy && VisibleDialogs.Count == 0 && ErrorMessage == null;
+    public string CategoryHint => CurrentCategory switch
+    {
+        DialogCategoryTab.Channels => "Подписки, из которых можно выйти.",
+        DialogCategoryTab.Chats => "Группы и супергруппы, из которых можно выйти.",
+        DialogCategoryTab.Bots => "Диалоги с ботами. Удаление истории не блокирует бота.",
+        _ => "Диалоги с удалёнными аккаунтами."
+    };
+    public string EmptyTitle => HasFilters ? "Ничего не найдено" : "Здесь пока нет диалогов";
+    public string EmptyHint => HasFilters ? "Измените запрос или сбросьте фильтры." : "Диалоги этой категории появятся после обновления списка.";
+
+
+    [ObservableProperty]
+    private IReadOnlyList<DialogItemViewModel> _visibleDialogs = Array.Empty<DialogItemViewModel>();
 
     public IReadOnlyList<string> FilterOptions { get; } = new[]
     {
         "Все",
         "Непрочитанные",
-        "Мало участников (≤50)"
+        "До 50 участников"
     };
 
     public IReadOnlyList<string> SortOptions { get; } = new[]
     {
         "По названию (А-Я)",
-        "По активности (непрочитанные)",
+        "По непрочитанным",
         "По числу участников",
-        "По последней активности"
+        "По дате активности"
     };
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CurrentCategoryTitleWithCount))]
+    [NotifyPropertyChangedFor(nameof(CategoryHint))]
     [NotifyPropertyChangedFor(nameof(BottomStatusBarText))]
     private int _selectedCategoryIndex = 0;
 
@@ -141,7 +162,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
         }
         set
         {
-            if (_isUpdatingAllSelected || _isBatchUpdating) return;
+            if (!CanSelect || _isUpdatingAllSelected || _isBatchUpdating) return;
             if (!value.HasValue) return;
             _isUpdatingAllSelected = true;
             _isBatchUpdating = true;
@@ -193,10 +214,10 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
         Dispatcher.Enqueue(() =>
         {
-            var matchedVm = _allDialogs.FirstOrDefault(d => d.Id == log.DialogId);
+            var matchedVm = _allDialogs.FirstOrDefault(d => d.Id == log.DialogId && d.DialogType == log.DialogType);
             if (matchedVm != null)
             {
-                string badge = matchedVm.DialogType == DialogType.Deleted ? "🗑 Удален" : "✅ Вышел";
+                string badge = matchedVm.DialogType is DialogType.Bot or DialogType.User or DialogType.Deleted ? "Удалён" : "Вышли";
                 matchedVm.MarkLeft(badge);
                 UpdateCountersAndActionButton();
             }
@@ -205,64 +226,93 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     private void OnEngineProgressChanged(object? sender, BulkProgressReport report)
     {
-        if (report.State is BulkOperationState.Completed or BulkOperationState.Interrupted)
+        Dispatcher.Enqueue(() =>
         {
-            var models = _allDialogs.Select(d => d.Model).ToList();
-            _ = _cacheService.SaveDialogCacheAsync(models);
+            if (report.State is BulkOperationState.Completed or BulkOperationState.Interrupted) _ = PersistDialogsAsync();
+        });
+    }
+
+    public void SetOperationActive(bool active)
+    {
+        _operationActive = active;
+        foreach (var item in _allDialogs) item.SelectionEnabled = CanSelect;
+        UpdateCountersAndActionButton();
+    }
+
+    public void ResetAccount()
+    {
+        _avatarLoad?.Cancel();
+        HasRequestedDialogs = false;
+        _hasFreshDialogs = false;
+        SearchQuery = string.Empty;
+        SelectedFilterIndex = 0;
+        ErrorMessage = null;
+        StatusMessage = null;
+        SetDialogs(Array.Empty<DialogItem>());
+    }
+
+    private async Task PersistDialogsAsync()
+    {
+        try { await _cacheService.SaveDialogCacheAsync(_allDialogs.Select(d => d.Model.Clone()).ToArray()); }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            StatusMessage = "Не удалось сохранить локальную копию списка.";
         }
     }
 
-    public async Task InitializeAsync()
-    {
-        await LoadDialogsAsync();
-    }
+    public Task InitializeAsync() => HasRequestedDialogs ? Task.CompletedTask : LoadDialogsAsync();
 
     [RelayCommand]
     public async Task LoadDialogsAsync()
     {
+        if (!CanRefresh) return;
         IsBusy = true;
+        foreach (var item in _allDialogs) item.SelectionEnabled = false;
+        _hasFreshDialogs = false;
+        _avatarLoad?.Cancel();
         ErrorMessage = null;
-        StatusMessage = "Загрузка списка диалогов...";
+        StatusMessage = "Загрузка диалогов из Telegram…";
+        UpdateCountersAndActionButton();
 
         try
         {
-            // 1. Try disk cache first for instant startup
-            var cached = await _cacheService.LoadDialogCacheAsync();
-            if (cached != null && cached.Count > 0)
+            if (!HasRequestedDialogs)
             {
-                SetDialogs(cached);
-                StatusMessage = $"Загружено {cached.Count} диалогов из кэша.";
+                HasRequestedDialogs = true;
+                SetDialogs(await _cacheService.LoadDialogCacheAsync());
             }
 
-            // 2. Refresh from Telegram MTProto
             var remote = await _telegramService.FetchDialogsAsync();
-            if (remote != null && remote.Count > 0)
-            {
-                SetDialogs(remote);
-                await _cacheService.SaveDialogCacheAsync(remote);
-                StatusMessage = $"Синхронизировано {remote.Count} диалогов.";
+            SetDialogs(remote);
+            _hasFreshDialogs = true;
+            StatusMessage = $"Синхронизировано диалогов: {remote.Count}.";
+            await PersistDialogsAsync();
 
-                // 3. Trigger asynchronous background avatar fetching
-                _ = FetchAvatarsInBackgroundAsync(remote);
-            }
+            _avatarLoad = new CancellationTokenSource();
+            _ = FetchAvatarsInBackgroundAsync(_allDialogs.ToArray(), _avatarLoad);
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorMessage = $"Не удалось загрузить диалоги: {ex.Message}";
+            StatusMessage = VisibleDialogs.Count > 0 ? "Показана локальная копия. Для действий обновите список." : null;
+            ErrorMessage = "Не удалось загрузить диалоги. Проверьте подключение и нажмите «Обновить».";
         }
         finally
         {
             IsBusy = false;
+            foreach (var item in _allDialogs) item.SelectionEnabled = CanSelect;
+            UpdateCountersAndActionButton();
         }
     }
 
     public void SetDialogs(IEnumerable<DialogItem> items)
     {
+        foreach (var old in _allDialogs) old.SelectionChanged -= OnItemSelectionChanged;
         _allDialogs.Clear();
         foreach (var item in items)
         {
             var vm = new DialogItemViewModel(item);
             vm.SelectionChanged += OnItemSelectionChanged;
+            vm.SelectionEnabled = CanSelect;
             _allDialogs.Add(vm);
         }
 
@@ -292,6 +342,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     partial void OnSelectedCategoryIndexChanged(int value)
     {
+        DeselectAll();
         ApplyFiltersAndSort();
     }
 
@@ -327,7 +378,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
         // 2. Search query (title and username)
         if (!string.IsNullOrWhiteSpace(SearchQuery))
         {
-            string q = SearchQuery.Trim();
+            string q = SearchQuery.Trim().TrimStart('@');
             query = query.Where(d =>
                 d.Title.Contains(q, StringComparison.CurrentCultureIgnoreCase) ||
                 (d.Username != null && d.Username.Contains(q, StringComparison.CurrentCultureIgnoreCase)));
@@ -337,7 +388,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
         query = SelectedFilterIndex switch
         {
             1 => query.Where(d => d.UnreadCount > 0),            // Непрочитанные
-            2 => query.Where(d => d.ParticipantCount <= 50),     // Мало участников
+            2 => query.Where(d => d.ParticipantCount is > 0 and <= 50),     // Мало участников
             _ => query
         };
 
@@ -350,20 +401,31 @@ public sealed partial class DialogListViewModel : ViewModelBase
             _ => query.OrderBy(d => d.Title, StringComparer.CurrentCultureIgnoreCase)   // По названию
         };
 
-        var filteredList = query.ToList();
-
-        VisibleDialogs.Clear();
-        foreach (var item in filteredList)
+        var filtered = query.ToArray();
+        var scope = filtered.ToHashSet();
+        _isBatchUpdating = true;
+        try
         {
-            VisibleDialogs.Add(item);
+            foreach (var item in _allDialogs)
+                if (item.IsSelected && !scope.Contains(item)) item.IsSelected = false;
+            VisibleDialogs = filtered;
         }
+        finally { _isBatchUpdating = false; }
 
         UpdateCountersAndActionButton();
     }
 
     [RelayCommand]
+    public void ClearFilters()
+    {
+        SearchQuery = string.Empty;
+        SelectedFilterIndex = 0;
+    }
+
+    [RelayCommand]
     public void SelectAll()
     {
+        if (!CanSelect) return;
         _isBatchUpdating = true;
         try
         {
@@ -411,13 +473,19 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     public void UpdateCountersAndActionButton()
     {
-        int selectedInCurrentView = VisibleDialogs.Count(d => d.IsSelected);
+        int selectedInCurrentView = VisibleDialogs.Count(d => d.IsSelected && d.IsJoined);
         int totalInCurrentView = VisibleDialogs.Count;
         int leftInCurrentView = VisibleDialogs.Count(d => !d.IsJoined);
 
         SelectedCount = selectedInCurrentView;
         LeftCount = leftInCurrentView;
-        CanExecuteAction = selectedInCurrentView > 0;
+        CanExecuteAction = CanSelect && selectedInCurrentView > 0;
+        OnPropertyChanged(nameof(CanSelect));
+        OnPropertyChanged(nameof(CanRefresh));
+        OnPropertyChanged(nameof(ShowEmpty));
+        OnPropertyChanged(nameof(HasFilters));
+        OnPropertyChanged(nameof(EmptyTitle));
+        OnPropertyChanged(nameof(EmptyHint));
 
         SelectionCounterText = $"Выбрано: {selectedInCurrentView} из {totalInCurrentView}" +
             (leftInCurrentView > 0 ? $" | Вышло: {leftInCurrentView}" : "");
@@ -427,19 +495,19 @@ public sealed partial class DialogListViewModel : ViewModelBase
         {
             ActionButtonText = category switch
             {
-                DialogCategoryTab.Deleted => "🗑 Удалить выбранные",
-                DialogCategoryTab.Bots => "🚪 Остановить выбранные",
-                _ => "🚪 Выйти из выбранных"
+                DialogCategoryTab.Deleted => "Удалить выбранные",
+                DialogCategoryTab.Bots => "Удалить диалоги",
+                _ => "Выйти из выбранных"
             };
         }
         else
         {
             ActionButtonText = category switch
             {
-                DialogCategoryTab.Deleted => $"🗑 Удалить {selectedInCurrentView} {GetRussianPlural(selectedInCurrentView, "диалог", "диалога", "диалогов")}",
-                DialogCategoryTab.Bots => $"🚪 Остановить {selectedInCurrentView} {GetRussianPlural(selectedInCurrentView, "бота", "ботов", "ботов")}",
-                DialogCategoryTab.Chats => $"🚪 Выйти из {selectedInCurrentView} {GetRussianPlural(selectedInCurrentView, "чата", "чатов", "чатов")}",
-                _ => $"🚪 Выйти из {selectedInCurrentView} {GetRussianPlural(selectedInCurrentView, "канала", "каналов", "каналов")}"
+                DialogCategoryTab.Deleted => $"Удалить {selectedInCurrentView} {GetRussianPlural(selectedInCurrentView, "диалог", "диалога", "диалогов")}",
+                DialogCategoryTab.Bots => $"Удалить диалоги ({selectedInCurrentView})",
+                DialogCategoryTab.Chats => $"Выйти из чатов ({selectedInCurrentView})",
+                _ => $"Выйти из каналов ({selectedInCurrentView})"
             };
         }
 
@@ -457,43 +525,41 @@ public sealed partial class DialogListViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
-    public void StartBulkAction()
+    public IReadOnlyList<DialogItem> GetSelectedItems() => CanExecuteAction
+        ? VisibleDialogs.Where(d => d.IsSelected && d.IsJoined).Select(d => d.Model).ToArray()
+        : Array.Empty<DialogItem>();
+
+    public void ExecuteSelection(IReadOnlyList<DialogItem> items)
     {
-        var selectedItems = VisibleDialogs
-            .Where(d => d.IsSelected && d.IsJoined)
-            .Select(d => d.Model)
-            .ToList();
-
-        if (selectedItems.Count == 0) return;
-
-        WeakReferenceMessenger.Default.Send(new StartBulkExecutionMessage(selectedItems));
+        if (!CanExecuteAction || items.Count == 0) return;
+        _avatarLoad?.Cancel();
+        WeakReferenceMessenger.Default.Send(new StartBulkExecutionMessage(items));
     }
 
-    private async Task FetchAvatarsInBackgroundAsync(IReadOnlyList<DialogItem> items)
+    private async Task FetchAvatarsInBackgroundAsync(DialogItemViewModel[] items, CancellationTokenSource source)
     {
+        var ct = source.Token;
         try
         {
             foreach (var item in items)
             {
-                if (string.IsNullOrEmpty(item.AvatarLocalPath) || !System.IO.File.Exists(item.AvatarLocalPath))
+                ct.ThrowIfCancellationRequested();
+                if (string.IsNullOrEmpty(item.AvatarLocalPath))
                 {
-                    string? path = await _telegramService.DownloadAvatarAsync(item.Id);
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        item.AvatarLocalPath = path;
-                        var matchedVm = _allDialogs.FirstOrDefault(d => d.Id == item.Id);
-                        if (matchedVm != null)
-                        {
-                            Dispatcher.Enqueue(() => matchedVm.AvatarLocalPath = path);
-                        }
-                    }
+                    var path = await _telegramService.DownloadAvatarAsync(item.Model, ct);
+                    if (!ct.IsCancellationRequested && path != null) item.AvatarLocalPath = path;
                 }
+                // Yield even on cache hits so keyboard and pointer input can run.
+                await Task.Yield();
             }
         }
-        catch
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (System.IO.IOException) { }
+        catch (UnauthorizedAccessException) { }
+        finally
         {
-            // Silently ignore background avatar fetch faults
+            if (ReferenceEquals(_avatarLoad, source)) _avatarLoad = null;
+            source.Dispose();
         }
     }
 
@@ -509,6 +575,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     public override void Dispose()
     {
+        _avatarLoad?.Cancel();
         _engine.LogEntryAdded -= OnEngineLogEntryAdded;
         _engine.ProgressChanged -= OnEngineProgressChanged;
         base.Dispose();

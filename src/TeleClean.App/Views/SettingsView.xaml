@@ -1,289 +1,60 @@
-<Page
-    x:Class="TeleClean.App.Views.SettingsView"
+<Page x:Class="TeleClean.App.Views.SettingsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:converters="using:TeleClean.App.Converters"
-    xmlns:vm="using:TeleClean.App.ViewModels"
-    mc:Ignorable="d">
-
-    <Page.Resources>
-        <converters:BooleanToVisibilityConverter x:Key="BoolToVis" />
-    </Page.Resources>
-
-    <Grid Padding="24,14,24,16" RowSpacing="12">
-        <Grid.RowDefinitions>
-            <!-- 0: Header & Action Bar -->
-            <RowDefinition Height="Auto" />
-            <!-- 1: Table Container inside ScrollViewer -->
-            <RowDefinition Height="*" />
-            <!-- 2: Bottom Status Bar -->
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <!-- Top Header & Action Buttons -->
-        <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-
-            <!-- Page Title -->
-            <TextBlock
-                Grid.Column="0"
-                Text="Настройки приложения"
-                FontWeight="SemiBold"
-                FontSize="18"
-                VerticalAlignment="Center"
-                Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-
-            <!-- Action Buttons on Header Right -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <Button
-                    Content="Очистить кэш"
-                    Command="{x:Bind ViewModel.ClearAvatarCacheCommand}"
-                    Height="32"
-                    CornerRadius="4"
-                    Padding="12,0" />
-
-                <Button
-                    Content="Выйти из аккаунта"
-                    Command="{x:Bind ViewModel.ResetSessionCommand}"
-                    Style="{ThemeResource AccentButtonStyle}"
-                    Height="32"
-                    CornerRadius="4"
-                    Padding="16,0"
-                    FontWeight="SemiBold" />
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer Background="{ThemeResource WorkspaceBrush}" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="14" Margin="24,20" MaxWidth="760" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Настройки" Style="{StaticResource WorkspaceTitle}" AutomationProperties.HeadingLevel="Level1"/>
+                <TextBlock Text="Оформление, скорость запросов и подключение к Telegram." Style="{StaticResource SupportingText}"/>
             </StackPanel>
-        </Grid>
+            <InfoBar IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" Severity="Error"
+                Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" IsClosable="False"/>
+            <InfoBar IsOpen="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}" Severity="Success"
+                Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" IsClosable="False"/>
 
-        <!-- Table Container inside ScrollViewer -->
-        <ScrollViewer Grid.Row="1" Padding="0,0,0,4">
-            <StackPanel Spacing="10">
-                <!-- Success / Info Message -->
-                <InfoBar
-                    IsOpen="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}"
-                    Severity="Success"
-                    Title="Успешно"
-                    Message="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                    IsClosable="True" />
+            <Border Style="{StaticResource WorkspacePanel}" Padding="20">
+                <StackPanel Spacing="13">
+                    <TextBlock Text="Оформление" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                    <ComboBox Header="Цветовая тема" MinWidth="200" SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}">
+                        <ComboBoxItem Content="Как в Windows"/><ComboBoxItem Content="Светлая"/><ComboBoxItem Content="Тёмная"/>
+                    </ComboBox>
+                    <ComboBox Header="Материал панели навигации" MinWidth="200" SelectedIndex="{x:Bind ViewModel.SelectedBackdropIndex, Mode=TwoWay}">
+                        <ComboBoxItem Content="Mica"/><ComboBoxItem Content="Mica Alt"/><ComboBoxItem Content="Акрил"/>
+                    </ComboBox>
+                </StackPanel>
+            </Border>
 
-                <!-- Error InfoBar -->
-                <InfoBar
-                    IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
-                    Severity="Error"
-                    Title="Ошибка"
-                    Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
-                    IsClosable="True" />
+            <Border Style="{StaticResource WorkspacePanel}" Padding="20">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Массовые операции" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                    <Slider Header="Пауза между запросами" AutomationProperties.Name="Пауза между запросами, секунды"
+                        Minimum="1" Maximum="10" StepFrequency="0.5" Value="{x:Bind ViewModel.DelayBetweenRequests, Mode=TwoWay}"/>
+                    <TextBlock Text="{x:Bind ViewModel.DelaySecondsText, Mode=OneWay}" Style="{StaticResource SupportingText}"/>
+                </StackPanel>
+            </Border>
 
-                <!-- Clean Minimalist Table Aesthetic Container -->
-                <Border
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
-
-                    <StackPanel>
-                        <!-- Table Header -->
-                        <Border
-                            Background="{ThemeResource LayerFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="0,0,0,1"
-                            Height="38"
-                            Padding="16,0">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="[Параметр]" Style="{StaticResource TableHeaderTextStyle}" />
-                                <TextBlock Grid.Column="1" Text="[Значение и действие]" Style="{StaticResource TableHeaderTextStyle}" />
-                            </Grid>
-                        </Border>
-
-                        <!-- Row 1: Theme -->
-                        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Тема оформления" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="Выбор светлого, тёмного или системного режима" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <ComboBox Grid.Column="1" SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}" Width="160" Height="32" VerticalAlignment="Center">
-                                    <x:String>Системная</x:String>
-                                    <x:String>Светлая</x:String>
-                                    <x:String>Тёмная</x:String>
-                                </ComboBox>
-                            </Grid>
-                        </Border>
-
-                        <!-- Row 2: Window Backdrop -->
-                        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Материал фона окна" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="Эффект полупрозрачности Windows 11" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <ComboBox Grid.Column="1" SelectedIndex="{x:Bind ViewModel.SelectedBackdropIndex, Mode=TwoWay}" Width="160" Height="32" VerticalAlignment="Center">
-                                    <x:String>Mica</x:String>
-                                    <x:String>Mica Alt</x:String>
-                                    <x:String>Acrylic</x:String>
-                                </ComboBox>
-                            </Grid>
-                        </Border>
-
-                        <!-- Row 3: Request Delay Slider -->
-                        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Интервал между запросами" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="Задержка между действиями для предотвращения FloodWait" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-                                    <Slider Minimum="1.0" Maximum="10.0" StepFrequency="0.5" Value="{x:Bind ViewModel.DelayBetweenRequests, Mode=TwoWay}" Width="160" />
-                                    <TextBlock Text="{x:Bind ViewModel.DelaySecondsText, Mode=OneWay}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-
-                        <!-- Row 4: MTProxy URL -->
-                        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="MTProxy / SOCKS5 URL" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="Прокси для обхода сетевых ограничений Telegram" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <Grid Grid.Column="1" ColumnSpacing="8" MaxWidth="520" HorizontalAlignment="Left">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" MinWidth="220" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox
-                                        Grid.Column="0"
-                                        PlaceholderText="https://t.me/proxy?server=...&amp;port=...&amp;secret=..."
-                                        Text="{x:Bind ViewModel.ProxyUrl, Mode=TwoWay}"
-                                        Height="32"
-                                        FontSize="12"
-                                        FontFamily="Cascadia Code, Consolas"
-                                        VerticalAlignment="Center" />
-                                    <Button Grid.Column="1" Content="Сохранить" Command="{x:Bind ViewModel.SaveProxyCommand}" Height="32" Padding="12,0" VerticalAlignment="Center" />
-                                    <Button Grid.Column="2" Content="Очистить" Command="{x:Bind ViewModel.ClearProxyCommand}" Height="32" Padding="12,0" VerticalAlignment="Center" />
-                                </Grid>
-                            </Grid>
-                        </Border>
-
-                        <!-- Row 5: Telegram API Credentials -->
-                        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="API ключи Telegram" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="Кастомные API ID и API Hash с my.telegram.org" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <Grid Grid.Column="1" ColumnSpacing="8" MaxWidth="520" HorizontalAlignment="Left">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="110" />
-                                        <ColumnDefinition Width="*" MinWidth="180" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <NumberBox
-                                        Grid.Column="0"
-                                        PlaceholderText="API ID"
-                                        Value="{x:Bind ViewModel.ApiId, Mode=TwoWay}"
-                                        SpinButtonPlacementMode="Hidden"
-                                        Height="32"
-                                        FontSize="12"
-                                        VerticalAlignment="Center" />
-                                    <PasswordBox
-                                        Grid.Column="1"
-                                        PlaceholderText="API Hash"
-                                        Password="{x:Bind ViewModel.ApiHash, Mode=TwoWay}"
-                                        Height="32"
-                                        FontSize="12"
-                                        VerticalAlignment="Center" />
-                                    <Button Grid.Column="2" Content="Сохранить" Command="{x:Bind ViewModel.SaveApiKeysCommand}" Height="32" Padding="12,0" VerticalAlignment="Center" />
-                                </Grid>
-                            </Grid>
-                        </Border>
-
-                        <!-- Row 6: Avatar Cache -->
-                        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Локальный кэш аватаров" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="Удалить сохранённые изображения профилей с диска" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Очистить кэш аватаров" Command="{x:Bind ViewModel.ClearAvatarCacheCommand}" Height="32" Padding="14,0" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
-
-                        <!-- Row 7: Session Termination / Logout -->
-                        <Border Padding="16,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Spacing="2" VerticalAlignment="Center">
-                                    <TextBlock Text="Сессия Telegram" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
-                                    <TextBlock Text="Завершить сеанс на сервере и сбросить локальную авторизацию" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="Выйти из аккаунта" Command="{x:Bind ViewModel.ResetSessionCommand}" Style="{ThemeResource AccentButtonStyle}" Height="32" Padding="14,0" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
+            <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Header="Подключение и API Telegram">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Изменения подключения применяются при следующем запуске приложения." Style="{StaticResource SupportingText}"/>
+                    <PasswordBox Header="Ссылка MTProxy" Password="{x:Bind ViewModel.ProxyUrl, Mode=TwoWay}" PasswordRevealMode="Peek"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Content="Сохранить прокси" Command="{x:Bind ViewModel.SaveProxyCommand}"/>
+                        <Button Content="Отключить" Command="{x:Bind ViewModel.ClearProxyCommand}"/>
                     </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
+                    <NumberBox Header="API ID" Minimum="0" Maximum="2147483647" Value="{x:Bind ViewModel.ApiId, Mode=TwoWay}"/>
+                    <PasswordBox Header="API Hash" Password="{x:Bind ViewModel.ApiHash, Mode=TwoWay}"/>
+                    <Button Content="Сохранить ключи" Command="{x:Bind ViewModel.SaveApiKeysCommand}"/>
+                </StackPanel>
+            </Expander>
 
-        <!-- Bottom Status Bar -->
-        <Border
-            Grid.Row="2"
-            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1"
-            CornerRadius="6"
-            Height="30"
-            Padding="12,0">
-
-            <Grid>
-                <TextBlock
-                    Text="{x:Bind ViewModel.SettingsFooterText, Mode=OneWay}"
-                    FontSize="11.5"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    VerticalAlignment="Center" />
-
-                <TextBlock
-                    HorizontalAlignment="Right"
-                    Text="{x:Bind ViewModel.AppVersionText, Mode=OneWay}"
-                    FontSize="11.5"
-                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    VerticalAlignment="Center" />
-            </Grid>
-        </Border>
-    </Grid>
+            <Border Style="{StaticResource WorkspacePanel}" Padding="20">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Данные и сессия" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                    <TextBlock Text="Выход из аккаунта завершит сессию TeleClean на этом устройстве." Style="{StaticResource SupportingText}"/>
+                    <Button Content="Очистить кэш аватаров" Command="{x:Bind ViewModel.ClearAvatarCacheCommand}"/>
+                    <Button Content="Выйти из аккаунта" Click="OnConfirmLogout"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </Page>

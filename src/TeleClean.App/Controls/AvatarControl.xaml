@@ -6,12 +6,12 @@
 
     <Grid x:Name="RootContainer">
         <!-- Colored Initials Fallback Circle -->
-        <Ellipse x:Name="FallbackCircle" Fill="#2990FF" />
+        <Border x:Name="FallbackCircle" CornerRadius="10" Background="{ThemeResource SelectionBrush}"/>
         <TextBlock
             x:Name="InitialsText"
             Text="?"
-            Foreground="White"
-            FontWeight="Bold"
+            Foreground="{ThemeResource BrandBrush}"
+            FontWeight="SemiBold"
             FontSize="15"
             HorizontalAlignment="Center"
             VerticalAlignment="Center" />

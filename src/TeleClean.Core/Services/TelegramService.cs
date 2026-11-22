@@ -29,6 +29,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
     private TaskCompletionSource<string>? _passwordInputTcs;
     private TaskCompletionSource<string?>? _passwordResultTcs;
     private Action? _onPasswordNeeded;
+    private CancellationToken _qrLoginToken;
 
     public bool IsConfigured
     {
@@ -38,6 +39,8 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
             return apiId > 0 && !string.IsNullOrWhiteSpace(apiHash);
         }
     }
+
+    public TimeSpan? RateLimitRetryAfter { get; private set; }
 
     public bool IsAuthorized => _client?.User != null && _client.UserId != 0;
 
@@ -49,47 +52,11 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
 
     public string GetSessionPath()
     {
-        var sessionPath = _configService.CurrentConfig.SessionPath;
-        if (!string.IsNullOrWhiteSpace(sessionPath) &&
-            !Path.GetFileName(sessionPath).Equals("teleclean.session", StringComparison.OrdinalIgnoreCase) &&
-            File.Exists(sessionPath))
-        {
-            return sessionPath;
-        }
-
-        var dataDirSession = Path.Combine(_configService.GetDataDirectory(), "teleclean_v2.session");
-        if (File.Exists(dataDirSession))
-        {
-            return dataDirSession;
-        }
-
-        var appDataSession = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "TeleClean",
-            "teleclean_v2.session");
-        if (File.Exists(appDataSession))
-        {
-            return appDataSession;
-        }
-
-        return !string.IsNullOrWhiteSpace(sessionPath) &&
-               !Path.GetFileName(sessionPath).Equals("teleclean.session", StringComparison.OrdinalIgnoreCase)
-            ? sessionPath
-            : dataDirSession;
-    }
-
-    private async Task SaveSessionPathToConfigAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            var config = _configService.CurrentConfig;
-            config.SessionPath = GetSessionPath();
-            await _configService.SaveConfigAsync(config, ct);
-        }
-        catch
-        {
-            // Best effort config update
-        }
+        var configured = _configService.CurrentConfig.SessionPath;
+        return !string.IsNullOrWhiteSpace(configured) &&
+            !Path.GetFileName(configured).Equals("teleclean.session", StringComparison.OrdinalIgnoreCase)
+            ? configured
+            : Path.Combine(_configService.GetDataDirectory(), "teleclean_v2.session");
     }
 
     private void EnsureClientCreated()
@@ -142,9 +109,6 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
 
     private string? HandlePasswordConfig()
     {
-        // Signal UI that 2FA cloud password is required
-        _onPasswordNeeded?.Invoke();
-
         // If a previous attempt was waiting for result, signal that it was rejected
         var prevResultTcs = Interlocked.Exchange(ref _passwordResultTcs, null);
         prevResultTcs?.TrySetResult("password");
@@ -152,14 +116,16 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         // Wait for user to supply the password via SubmitPasswordAsync
         var inputTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _passwordInputTcs = inputTcs;
+        using var cancellation = _qrLoginToken.Register(() => inputTcs.TrySetCanceled(_qrLoginToken));
+        _onPasswordNeeded?.Invoke();
 
         try
         {
             return inputTcs.Task.GetAwaiter().GetResult();
         }
-        catch (Exception)
+        finally
         {
-            return null;
+            Interlocked.CompareExchange(ref _passwordInputTcs, null, inputTcs);
         }
     }
 
@@ -176,7 +142,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 return;
             }
 
-            // Check if it's an SQLite file (from Python Telethon) or corrupt
+            // Preserve incompatible SQLite files for recovery.
             using var fs = new FileStream(sessionPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             if (fs.Length >= 16)
             {
@@ -185,7 +151,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 if (read >= 6 && header[0] == 'S' && header[1] == 'Q' && header[2] == 'L' && header[3] == 'i' && header[4] == 't' && header[5] == 'e')
                 {
                     fs.Dispose();
-                    File.Delete(sessionPath);
+                    File.Move(sessionPath, sessionPath + ".backup-" + Guid.NewGuid().ToString("N"));
                 }
             }
         }
@@ -223,7 +189,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 var sessionPath = GetSessionPath();
                 if (File.Exists(sessionPath))
                 {
-                    File.Delete(sessionPath);
+                    File.Move(sessionPath, sessionPath + ".backup-" + Guid.NewGuid().ToString("N"));
                 }
 
                 EnsureClientCreated();
@@ -260,7 +226,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
             var user = await _client.LoginUserIfNeeded();
             if (user != null && _client.UserId != 0)
             {
-                await SaveSessionPathToConfigAsync(ct);
+
                 return true;
             }
             return false;
@@ -286,6 +252,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         await _clientLock.WaitAsync(ct);
         try
         {
+            _qrLoginToken = ct;
             _activeLoginFlow = LoginFlow.Qr;
             _onPasswordNeeded = onPasswordNeeded;
             _passwordInputTcs = null;
@@ -295,7 +262,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
             if (IsAuthorized)
             {
                 _activeLoginFlow = LoginFlow.None;
-                await SaveSessionPathToConfigAsync(ct);
+
                 return "LOGIN_SUCCESS";
             }
 
@@ -308,7 +275,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                     _passwordResultTcs?.TrySetResult("LOGIN_SUCCESS");
                     _passwordInputTcs = null;
                     _passwordResultTcs = null;
-                    await SaveSessionPathToConfigAsync(ct);
+
                     return "LOGIN_SUCCESS";
                 }
             }
@@ -329,7 +296,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                     _passwordResultTcs?.TrySetResult("LOGIN_SUCCESS");
                     _passwordInputTcs = null;
                     _passwordResultTcs = null;
-                    await SaveSessionPathToConfigAsync(ct);
+
                     return "LOGIN_SUCCESS";
                 }
             }
@@ -346,7 +313,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 _passwordResultTcs?.TrySetResult("LOGIN_SUCCESS");
                 _passwordInputTcs = null;
                 _passwordResultTcs = null;
-                await SaveSessionPathToConfigAsync(ct);
+
                 return "LOGIN_SUCCESS";
             }
 
@@ -354,6 +321,9 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         }
         finally
         {
+            _activeLoginFlow = LoginFlow.None;
+            _onPasswordNeeded = null;
+            if (ct.IsCancellationRequested) _passwordResultTcs?.TrySetCanceled(ct);
             _clientLock.Release();
         }
     }
@@ -371,7 +341,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
             if (needed == null && IsAuthorized)
             {
                 _activeLoginFlow = LoginFlow.None;
-                await SaveSessionPathToConfigAsync(ct);
+
                 return "LOGIN_SUCCESS";
             }
             return needed ?? (IsAuthorized ? "LOGIN_SUCCESS" : "verification_code");
@@ -466,7 +436,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                     if (needed == null && IsAuthorized)
                     {
                         _activeLoginFlow = LoginFlow.None;
-                        await SaveSessionPathToConfigAsync(ct);
+
                         return "LOGIN_SUCCESS";
                     }
                     return needed ?? (IsAuthorized ? "LOGIN_SUCCESS" : "password");
@@ -487,7 +457,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 if (user != null && _client.UserId != 0)
                 {
                     _activeLoginFlow = LoginFlow.None;
-                    await SaveSessionPathToConfigAsync(ct);
+
                     return "LOGIN_SUCCESS";
                 }
                 return "password";
@@ -515,64 +485,15 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
             _passwordResultTcs?.TrySetCanceled();
             _passwordResultTcs = null;
 
+            var sessionPath = GetSessionPath();
             if (_client != null)
             {
-                try
-                {
-                    if (IsAuthorized)
-                    {
-                        await _client.Auth_LogOut();
-                    }
-                }
-                catch
-                {
-                    // Ignore network / logout errors during reset
-                }
-
-                try
-                {
-                    await _client.ResetAsync(resetUser: true, resetSessions: true);
-                    await _client.DisposeAsync();
-                }
-                catch
-                {
-                    // Ignore dispose errors
-                }
-
+                if (IsAuthorized) await _client.Auth_LogOut();
+                await _client.DisposeAsync();
                 _client = null;
-                _cachedDialogs = null;
             }
-
-            // Cleanup session files on disk across all known candidate locations with retry for OS file locks
-            var sessionPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                GetSessionPath(),
-                Path.Combine(_configService.GetDataDirectory(), "teleclean_v2.session"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TeleClean", "teleclean_v2.session")
-            };
-
-            var suffixes = new[] { "", "-journal", "-wal", "-shm" };
-            foreach (var basePath in sessionPaths)
-            {
-                foreach (var suffix in suffixes)
-                {
-                    var file = basePath + suffix;
-                    if (!File.Exists(file)) continue;
-
-                    for (int attempt = 0; attempt < 3; attempt++)
-                    {
-                        try
-                        {
-                            File.Delete(file);
-                            break;
-                        }
-                        catch (IOException)
-                        {
-                            await Task.Delay(100, ct);
-                        }
-                    }
-                }
-            }
+            _cachedDialogs = null;
+            File.Delete(sessionPath);
 
             // Clear cached dialogs
             await _cacheService.ClearCacheAsync(ct);
@@ -629,15 +550,15 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
 
             var result = new List<DialogItem>(dialogs.dialogs.Length);
 
-            Dictionary<int, TL.MessageBase>? messageDict = null;
+            Dictionary<(Type, long, int), TL.MessageBase>? messageDict = null;
             if (dialogs.messages != null)
             {
-                messageDict = new Dictionary<int, TL.MessageBase>(dialogs.messages.Length);
+                messageDict = new Dictionary<(Type, long, int), TL.MessageBase>(dialogs.messages.Length);
                 foreach (var msg in dialogs.messages)
                 {
-                    if (msg != null)
+                    if (msg?.Peer is { } peer)
                     {
-                        messageDict[msg.ID] = msg;
+                        messageDict[(peer.GetType(), peer.ID, msg.ID)] = msg;
                     }
                 }
             }
@@ -651,7 +572,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
 
                 int unreadCount = d is TL.Dialog dialog ? dialog.unread_count : 0;
                 DateTime? lastActivity = null;
-                if (d is TL.Dialog dl && dl.top_message > 0 && messageDict != null && messageDict.TryGetValue(dl.top_message, out var topMsg))
+                if (d is TL.Dialog dl && dl.top_message > 0 && messageDict != null && messageDict.TryGetValue((d.Peer.GetType(), d.Peer.ID, dl.top_message), out var topMsg))
                 {
                     try { lastActivity = topMsg.Date; } catch { /* ignore date parse */ }
                 }
@@ -747,9 +668,6 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 }
             }
 
-            // Persist to local disk cache for instant startup
-            await _cacheService.SaveDialogCacheAsync(result, ct);
-
             return result;
         }
         finally
@@ -800,6 +718,7 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         }
         catch (RpcException ex) when (ex.Code == 420) // FLOOD_WAIT_X
         {
+            RateLimitRetryAfter = ex.X > 0 ? TimeSpan.FromSeconds(ex.X) : null;
             return LeaveResult.RateLimited;
         }
         catch (RpcException ex) when (ex.Code == 400 && ex.Message.Contains("CHANNEL_PRIVATE", StringComparison.OrdinalIgnoreCase))
@@ -814,6 +733,10 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         {
             return LeaveResult.Forbidden;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
         catch
         {
             return LeaveResult.Error;
@@ -824,8 +747,9 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         }
     }
 
-    public async Task<string?> DownloadAvatarAsync(long dialogId, CancellationToken ct = default)
+    public async Task<string?> DownloadAvatarAsync(DialogItem item, CancellationToken ct = default)
     {
+        var dialogId = item.AvatarCacheKey;
         if (_cacheService.HasAvatar(dialogId))
         {
             return _cacheService.GetAvatarPath(dialogId);
@@ -841,7 +765,13 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 return null;
             }
 
-            var dialog = Array.Find(_cachedDialogs.dialogs, d => d.Peer.ID == dialogId);
+            var dialog = Array.Find(_cachedDialogs.dialogs, d => d.Peer.ID == item.Id && (d.Peer switch
+            {
+                PeerChannel => item.DialogType is DialogType.Channel or DialogType.Supergroup,
+                PeerChat => item.DialogType == DialogType.Group,
+                PeerUser => item.DialogType is DialogType.User or DialogType.Bot or DialogType.Deleted,
+                _ => false
+            }));
             if (dialog == null) return null;
 
             var peerInfo = _cachedDialogs.UserOrChat(dialog.Peer);

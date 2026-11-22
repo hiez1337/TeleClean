@@ -314,6 +314,17 @@ public sealed class CacheService : ICacheService
         }
     }
 
+    public async Task ClearAvatarCacheAsync(CancellationToken ct = default)
+    {
+        await _avatarLock.WaitAsync(ct);
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(GetAvatarsDirectory(), "*.jpg"))
+                File.Delete(file);
+        }
+        finally { _avatarLock.Release(); }
+    }
+
     public async Task ClearCacheAsync(CancellationToken ct = default)
     {
         await _cacheLock.WaitAsync(ct);

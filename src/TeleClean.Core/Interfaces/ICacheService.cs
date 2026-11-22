@@ -42,8 +42,10 @@ public interface ICacheService
     /// </summary>
     Task<string> SaveAvatarAsync(long dialogId, Stream stream, CancellationToken ct = default);
 
+    Task ClearAvatarCacheAsync(CancellationToken ct = default) => Task.CompletedTask;
+
     /// <summary>
-    /// Clears dialog cache and optional history.
+    /// Clears the dialog snapshot.
     /// </summary>
     Task ClearCacheAsync(CancellationToken ct = default);
 }
