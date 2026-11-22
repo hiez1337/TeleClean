@@ -40,9 +40,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private bool _isInitializing;
 
     public string DelaySecondsText => $"{DelayBetweenRequests:F1} сек";
-    public string AppVersionText => "TeleClean v2.0.0";
+    public string AppVersionText => $"TeleClean {typeof(App).Assembly.GetName().Version?.ToString(3)}";
+    public string DataDirectory => _configService.GetDataDirectory();
     public string SessionStatusText => _telegramService.IsAuthorized ? "Сессия: Активна" : "Сессия: Не авторизован";
-    public string SettingsFooterText => $"TeleClean v2.0.0 | Хранилище: {_configService.GetDataDirectory()} | {(_telegramService.IsAuthorized ? "Сессия: Активна" : "Сессия: Требуется вход")}";
+    public string SettingsFooterText => $"{AppVersionText} | Хранилище: {_configService.GetDataDirectory()} | {(_telegramService.IsAuthorized ? "Сессия: Активна" : "Сессия: Требуется вход")}";
 
     public SettingsViewModel(
         IConfigService configService,
