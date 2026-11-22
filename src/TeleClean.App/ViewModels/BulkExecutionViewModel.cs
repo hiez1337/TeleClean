@@ -317,8 +317,8 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     {
         _engine.ProgressChanged -= OnEngineProgressChanged;
         _engine.LogEntryAdded -= OnEngineLogEntryAdded;
+        _elapsedTimer?.Dispose();
         _executionCts?.Cancel();
-        _executionCts?.Dispose();
         WeakReferenceMessenger.Default.UnregisterAll(this);
         base.Dispose();
     }

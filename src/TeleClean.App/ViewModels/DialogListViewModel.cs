@@ -93,7 +93,16 @@ public sealed partial class DialogListViewModel : ViewModelBase
     private int _selectedFilterIndex = 0;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TitleSortHeader))]
+    [NotifyPropertyChangedFor(nameof(ParticipantsSortHeader))]
+    [NotifyPropertyChangedFor(nameof(UnreadSortHeader))]
+    [NotifyPropertyChangedFor(nameof(ActivitySortHeader))]
     private int _selectedSortIndex = 0;
+
+    public string TitleSortHeader => SelectedSortIndex == 0 ? "Название ↑" : "Название";
+    public string ParticipantsSortHeader => SelectedSortIndex == 2 ? "Участники ↓" : "Участники";
+    public string UnreadSortHeader => SelectedSortIndex == 1 ? "Непрочитано ↓" : "Непрочитано";
+    public string ActivitySortHeader => SelectedSortIndex == 3 ? "Активность ↓" : "Активность";
 
     [ObservableProperty]
     private string _selectionCounterText = "Выбрано: 0 из 0";

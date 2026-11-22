@@ -15,6 +15,7 @@ public sealed class ConfigService : IConfigService
     private readonly object _lock = new();
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly string? _customDataDir;
+    private readonly Lazy<string> _dataDirectory;
     private AppConfig _currentConfig = new();
     private bool _isLoaded;
 
@@ -40,6 +41,7 @@ public sealed class ConfigService : IConfigService
     public ConfigService(string? customDataDir)
     {
         _customDataDir = customDataDir;
+        _dataDirectory = new Lazy<string>(ResolveDataDirectory);
     }
 
     private void LoadSyncInternal()
@@ -87,7 +89,9 @@ public sealed class ConfigService : IConfigService
         }
     }
 
-    public string GetDataDirectory()
+    public string GetDataDirectory() => _dataDirectory.Value;
+
+    private string ResolveDataDirectory()
     {
         if (!string.IsNullOrWhiteSpace(_customDataDir))
         {

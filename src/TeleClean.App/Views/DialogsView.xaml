@@ -42,7 +42,13 @@
         <StackPanel Grid.Row="2" Spacing="6">
             <InfoBar Title="Список недоступен" Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                 Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" IsClosable="False"/>
-            <TextBlock Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <TextBlock Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                    VerticalAlignment="Center" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
+                <HyperlinkButton Grid.Column="1" Content="Сбросить фильтры" Visibility="{x:Bind ViewModel.HasFilters, Mode=OneWay}"
+                    Command="{x:Bind ViewModel.ClearFiltersCommand}" Padding="4,0"/>
+            </Grid>
             <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}"/>
         </StackPanel>
 
@@ -58,15 +64,16 @@
                         AutomationProperties.Name="Выбрать видимые" ToolTipService.ToolTip="Выбрать видимые"
                         IsChecked="{x:Bind ViewModel.IsAllSelectedInView, Mode=OneWay}"
                         IsEnabled="{x:Bind ViewModel.CanSelectVisible, Mode=OneWay}" Click="OnSelectVisible"/>
-                    <TextBlock x:Name="NameHeading" Grid.Column="2" VerticalAlignment="Center" FontWeight="SemiBold"
-                        Text="Название"/>
+                    <Button x:Name="NameHeading" Grid.Column="2" Style="{StaticResource ColumnSortButton}" HorizontalAlignment="Left"
+                        Content="{x:Bind ViewModel.TitleSortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortByTitleCommand}"
+                        ToolTipService.ToolTip="По названию от А до Я"/>
                     <Grid x:Name="ComparisonHeading" Grid.Column="3" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="86"/><ColumnDefinition Width="106"/><ColumnDefinition Width="132"/><ColumnDefinition Width="112"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="Участники" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        <TextBlock Grid.Column="1" Text="Непрочитано" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        <TextBlock Grid.Column="2" Text="Последняя активность" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12"/>
+                        <Button Style="{StaticResource ColumnSortButton}" Content="{x:Bind ViewModel.ParticipantsSortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortBySubscribersCommand}" ToolTipService.ToolTip="По числу участников, сначала больше"/>
+                        <Button Grid.Column="1" Style="{StaticResource ColumnSortButton}" Content="{x:Bind ViewModel.UnreadSortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortByUnreadCommand}" ToolTipService.ToolTip="По числу непрочитанных, сначала больше"/>
+                        <Button Grid.Column="2" Style="{StaticResource ColumnSortButton}" Content="{x:Bind ViewModel.ActivitySortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortByActivityCommand}" ToolTipService.ToolTip="По последней активности, сначала новые"/>
                         <TextBlock Grid.Column="3" Text="Статус" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </Grid>
                 </Grid>

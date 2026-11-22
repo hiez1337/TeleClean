@@ -19,6 +19,16 @@
                         <InfoBar Title="Вход не завершён" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
                                  Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" Severity="Error" IsClosable="False"/>
                         <ProgressBar Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" IsIndeterminate="True"/>
+                        <StackPanel Visibility="{x:Bind ViewModel.IsRecoveryMode, Mode=OneWay}" Spacing="12">
+                            <TextBlock Text="Подключение к Telegram" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                            <TextBlock Text="Сохранённая сессия используется для повторного входа." Style="{StaticResource SupportingText}"/>
+                            <Button Content="Повторить подключение" Command="{x:Bind ViewModel.InitializeCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}" Style="{ThemeResource AccentButtonStyle}"/>
+                            <HyperlinkButton Content="Настройки подключения" Click="OnProxySettingsClick"
+                                             IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
+                            <Button Content="Открыть вход по QR-коду" Command="{x:Bind ViewModel.SwitchToQrModeCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
+                        </StackPanel>
                         <Grid x:Name="QrLayout" Visibility="{x:Bind ViewModel.IsQrMode, Mode=OneWay}"
                               ColumnSpacing="24" RowSpacing="16" SizeChanged="OnQrLayoutSizeChanged">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

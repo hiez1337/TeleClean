@@ -57,6 +57,14 @@
                     <Button Content="Выйти из аккаунта" Click="OnConfirmLogout"/>
                 </StackPanel>
             </Border>
+            <Expander Header="О приложении и локальных данных" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="{x:Bind ViewModel.AppVersionText}" FontWeight="SemiBold"/>
+                    <TextBlock Text="При закрытии окна вход сохраняется. Для завершения сессии используйте «Выйти из аккаунта»." Style="{StaticResource SupportingText}"/>
+                    <TextBlock Text="Папка данных на этом устройстве" Style="{StaticResource SupportingText}"/>
+                    <TextBlock Text="{x:Bind ViewModel.DataDirectory}" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                </StackPanel>
+            </Expander>
         </StackPanel>
     </ScrollViewer>
 </Page>

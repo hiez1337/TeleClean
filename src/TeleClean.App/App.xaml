@@ -31,6 +31,16 @@
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
             <converters:InvertedBooleanToVisibilityConverter x:Key="InvertedBoolToVis"/>
+            <Style x:Key="ColumnSortButton" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="MinHeight" Value="36"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="HorizontalAlignment" Value="Right"/>
+            </Style>
             <Style x:Key="WorkspaceTitle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="26"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
