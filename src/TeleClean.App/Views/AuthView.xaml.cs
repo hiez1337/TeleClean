@@ -93,9 +93,11 @@ public sealed partial class AuthView : UserControl
             {
                 config.ProxyUrl = string.IsNullOrWhiteSpace(proxyBox.Password) ? null : proxyBox.Password.Trim();
                 await configService.SaveConfigAsync(config);
+                bool restoringSession = ViewModel.IsRecoveryMode;
                 ViewModel.CancelQrLogin();
                 await App.Services.GetRequiredService<ITelegramService>().RecreateClientAsync();
-                ViewModel.StartQrLogin();
+                if (restoringSession) await ViewModel.InitializeAsync();
+                else ViewModel.StartQrLogin();
             }
             catch
             {

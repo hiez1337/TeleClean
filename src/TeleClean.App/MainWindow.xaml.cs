@@ -21,6 +21,8 @@ public sealed partial class MainWindow : Window,
     IRecipient<ThemeChangedMessage>, IRecipient<BackdropChangedMessage>
 {
     private object? _lastDialogCategory;
+    private bool _closing;
+    private bool _shutdownComplete;
 
     public void ReturnToDialogs() => Navigation.SelectedItem = _lastDialogCategory ?? Channels;
 
@@ -42,6 +44,7 @@ public sealed partial class MainWindow : Window,
         AppWindow.Resize(new Windows.Graphics.SizeInt32(
             Math.Min(workArea.Width, (int)(1100 * scale)),
             Math.Min(workArea.Height, (int)(750 * scale))));
+        AppWindow.Closing += OnWindowClosing;
         Closed += (_, _) =>
         {
             WeakReferenceMessenger.Default.UnregisterAll(this);
@@ -53,6 +56,32 @@ public sealed partial class MainWindow : Window,
         RootGrid.ActualThemeChanged += (_, _) => UpdateTitleBarTheme();
         SetAppTheme(config.Theme);
         SetBackdrop(config.Backdrop);
+    }
+
+    private async void OnWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_shutdownComplete) return;
+        args.Cancel = true;
+        if (_closing) return;
+        _closing = true;
+        RootGrid.IsHitTestVisible = false;
+        AuthViewControl.ViewModel.CancelQrLogin();
+        BulkExecutionVm.Stop();
+        DialogListVm.Dispose();
+
+        try
+        {
+            if (App.Services is IAsyncDisposable provider) await provider.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"TeleClean shutdown: {ex.GetType().Name}");
+        }
+        finally
+        {
+            _shutdownComplete = true;
+            Close();
+        }
     }
 
     [DllImport("user32.dll")]

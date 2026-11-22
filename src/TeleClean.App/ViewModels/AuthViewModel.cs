@@ -17,6 +17,7 @@ namespace TeleClean.App.ViewModels;
 public enum AuthMode
 {
     QrCode,
+    SessionRecovery,
     PhoneInput,
     CodeInput,
     TwoFactor
@@ -30,6 +31,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
     private int _isInitializing;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsRecoveryMode))]
     [NotifyPropertyChangedFor(nameof(IsQrMode))]
     [NotifyPropertyChangedFor(nameof(IsPhoneMode))]
     [NotifyPropertyChangedFor(nameof(Is2FaMode))]
@@ -59,6 +61,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
     [ObservableProperty]
     private bool _isAuthenticated;
 
+    public bool IsRecoveryMode => CurrentMode == AuthMode.SessionRecovery;
     public bool IsQrMode => CurrentMode == AuthMode.QrCode;
     public bool IsPhoneMode => CurrentMode is AuthMode.PhoneInput or AuthMode.CodeInput;
     public bool Is2FaMode => CurrentMode == AuthMode.TwoFactor;
@@ -76,6 +79,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
     /// <summary>
     /// Checks for existing active session on startup; if none, begins QR login flow.
     /// </summary>
+    [RelayCommand]
     public async Task InitializeAsync()
     {
         if (Interlocked.CompareExchange(ref _isInitializing, 1, 0) != 0)
@@ -83,6 +87,8 @@ public sealed partial class AuthViewModel : ViewModelBase,
             return;
         }
 
+        CurrentMode = AuthMode.SessionRecovery;
+        StatusMessage = "Восстанавливаем подключение к Telegram…";
         IsBusy = true;
         ErrorMessage = null;
         try
@@ -103,11 +109,11 @@ public sealed partial class AuthViewModel : ViewModelBase,
             IsBusy = false;
             StartQrLogin();
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorMessage = $"Ошибка проверки сессии: {ex.Message}";
-            IsBusy = false;
-            StartQrLogin();
+            CurrentMode = AuthMode.SessionRecovery;
+            StatusMessage = null;
+            ErrorMessage = "Не удалось восстановить подключение. Проверьте сеть или настройки прокси и повторите попытку.";
         }
         finally
         {
@@ -126,6 +132,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
         IsQrLoading = true;
         ErrorMessage = null;
         QrStatusText = "Генерация QR-кода...";
+        StatusMessage = null;
 
         var source = new CancellationTokenSource();
         _qrCts = source;

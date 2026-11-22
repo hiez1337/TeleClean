@@ -22,6 +22,10 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
     }
 
     private Client? _client;
+    private string? _sessionPath;
+    private volatile bool _disposed;
+    private readonly object _disposeGate = new();
+    private Task? _disposeTask;
     private Messages_Dialogs? _cachedDialogs;
     private LoginFlow _activeLoginFlow = LoginFlow.None;
 
@@ -52,15 +56,18 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
 
     public string GetSessionPath()
     {
+        if (_sessionPath != null) return _sessionPath;
+        var dataDirectory = _configService.GetDataDirectory();
         var configured = _configService.CurrentConfig.SessionPath;
-        return !string.IsNullOrWhiteSpace(configured) &&
+        return _sessionPath = !string.IsNullOrWhiteSpace(configured) &&
             !Path.GetFileName(configured).Equals("teleclean.session", StringComparison.OrdinalIgnoreCase)
-            ? configured
-            : Path.Combine(_configService.GetDataDirectory(), "teleclean_v2.session");
+            ? Path.GetFullPath(configured, dataDirectory)
+            : Path.Combine(dataDirectory, "teleclean_v2.session");
     }
 
     private void EnsureClientCreated()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (_client != null) return;
 
         var (apiId, apiHash) = _configService.GetEffectiveCredentials();
@@ -98,6 +105,9 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 return apiId.ToString();
             case "api_hash":
                 return apiHash;
+            // QR sessions have no phone_number. Trust the user stored in this local session.
+            case "user_id":
+                return "-1";
             case "session_pathname":
                 return sessionPath;
             case "password":
@@ -223,17 +233,12 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
                 return false;
             }
 
-            var user = await _client.LoginUserIfNeeded();
+            var user = await _client.LoginUserIfNeeded(reloginOnFailedResume: false);
             if (user != null && _client.UserId != 0)
             {
 
                 return true;
             }
-            return false;
-        }
-        catch (Exception ex)
-        {
-            await HandleCorruptedSessionAsync(ex);
             return false;
         }
         finally
@@ -797,19 +802,35 @@ public sealed class TelegramService : ITelegramService, IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
+        lock (_disposeGate)
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        _disposed = true;
         _onPasswordNeeded = null;
         _passwordInputTcs?.TrySetCanceled();
-        _passwordInputTcs = null;
         _passwordResultTcs?.TrySetCanceled();
-        _passwordResultTcs = null;
 
-        if (_client != null)
+        // Interrupt pending RPC/reconnect waits before acquiring the operation lock.
+        var closingClient = _client;
+        if (closingClient != null) await closingClient.DisposeAsync();
+
+        await _clientLock.WaitAsync();
+        try
         {
-            await _client.DisposeAsync();
+            // A constructor that was already running may have completed during shutdown.
+            if (_client != null && !ReferenceEquals(_client, closingClient))
+                await _client.DisposeAsync();
             _client = null;
+            _cachedDialogs = null;
         }
-        _clientLock.Dispose();
+        finally
+        {
+            _clientLock.Release();
+        }
     }
 }
