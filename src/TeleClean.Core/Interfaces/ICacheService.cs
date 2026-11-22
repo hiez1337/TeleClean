@@ -1,0 +1,49 @@
+using TeleClean.Core.Models;
+
+namespace TeleClean.Core.Interfaces;
+
+/// <summary>
+/// Service abstraction for local persistence of dialog metadata, avatars, and history logs.
+/// </summary>
+public interface ICacheService
+{
+    /// <summary>
+    /// Loads dialog metadata from local disk cache (channel_cache.json).
+    /// </summary>
+    Task<IReadOnlyList<DialogItem>> LoadDialogCacheAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Persists dialog metadata to local disk cache (channel_cache.json).
+    /// </summary>
+    Task SaveDialogCacheAsync(IEnumerable<DialogItem> dialogs, CancellationToken ct = default);
+
+    /// <summary>
+    /// Loads bulk execution history from leave_history.json.
+    /// </summary>
+    Task<IReadOnlyList<BulkLogEntry>> LoadHistoryAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Appends a new log entry to leave_history.json.
+    /// </summary>
+    Task AppendHistoryAsync(BulkLogEntry entry, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the absolute path where an avatar for the given dialog ID should be cached.
+    /// </summary>
+    string GetAvatarPath(long dialogId);
+
+    /// <summary>
+    /// Checks if a valid, non-corrupt avatar exists in disk cache for the given dialog ID.
+    /// </summary>
+    bool HasAvatar(long dialogId);
+
+    /// <summary>
+    /// Saves avatar binary stream to disk cache with integrity verification.
+    /// </summary>
+    Task<string> SaveAvatarAsync(long dialogId, Stream stream, CancellationToken ct = default);
+
+    /// <summary>
+    /// Clears dialog cache and optional history.
+    /// </summary>
+    Task ClearCacheAsync(CancellationToken ct = default);
+}

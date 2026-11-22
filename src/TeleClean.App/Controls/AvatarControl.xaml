@@ -1,0 +1,26 @@
+<UserControl
+    x:Class="TeleClean.App.Controls.AvatarControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Width="40" Height="40">
+
+    <Grid x:Name="RootContainer">
+        <!-- Colored Initials Fallback Circle -->
+        <Ellipse x:Name="FallbackCircle" Fill="#2990FF" />
+        <TextBlock
+            x:Name="InitialsText"
+            Text="?"
+            Foreground="White"
+            FontWeight="Bold"
+            FontSize="15"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center" />
+
+        <!-- Circular Profile Image -->
+        <Ellipse x:Name="ImageCircle" Visibility="Collapsed">
+            <Ellipse.Fill>
+                <ImageBrush x:Name="AvatarImageBrush" Stretch="UniformToFill" />
+            </Ellipse.Fill>
+        </Ellipse>
+    </Grid>
+</UserControl>
