@@ -12,6 +12,7 @@
                     <SolidColorBrush x:Key="WorkspaceBrush" Color="#151E27"/>
                     <SolidColorBrush x:Key="PanelBrush" Color="#1C2935"/>
                     <SolidColorBrush x:Key="SelectionBrush" Color="#304B65"/>
+                    <SolidColorBrush x:Key="SelectionStrokeBrush" Color="#779CBF"/>
                     <SolidColorBrush x:Key="BrandBrush" Color="#9BCFF7"/>
                     <SolidColorBrush x:Key="OnBrandBrush" Color="#142E43"/>
                 </ResourceDictionary>
@@ -19,6 +20,7 @@
                     <SolidColorBrush x:Key="WorkspaceBrush" Color="#F1F5F9"/>
                     <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF"/>
                     <SolidColorBrush x:Key="SelectionBrush" Color="#DBEBFC"/>
+                    <SolidColorBrush x:Key="SelectionStrokeBrush" Color="#507FA7"/>
                     <SolidColorBrush x:Key="BrandBrush" Color="#134B76"/>
                     <SolidColorBrush x:Key="OnBrandBrush" Color="#FFFFFF"/>
                 </ResourceDictionary>
@@ -26,27 +28,48 @@
                     <SolidColorBrush x:Key="WorkspaceBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="PanelBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="SelectionBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="SelectionStrokeBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
                     <SolidColorBrush x:Key="BrandBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
                     <SolidColorBrush x:Key="OnBrandBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
             <converters:InvertedBooleanToVisibilityConverter x:Key="InvertedBoolToVis"/>
+            <DataTemplate x:Key="WrappingLabel">
+                <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
+            </DataTemplate>
             <Style x:Key="ColumnSortButton" TargetType="Button">
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="BorderThickness" Value="0"/>
                 <Setter Property="Padding" Value="0"/>
-                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="ContentTemplate" Value="{StaticResource WrappingLabel}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
                 <Setter Property="MinHeight" Value="36"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
                 <Setter Property="HorizontalAlignment" Value="Right"/>
             </Style>
             <Style x:Key="WorkspaceTitle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="26"/>
+                <Setter Property="FontSize" Value="28"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+            <Style x:Key="SectionTitle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="20"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
             <Style x:Key="SupportingText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="14"/>
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+            <Style x:Key="RowMetadata" TargetType="TextBlock" BasedOn="{StaticResource SupportingText}">
+                <Setter Property="FontSize" Value="13"/>
+            </Style>
+            <Style x:Key="NumericCell" TargetType="TextBlock">
+                <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
+                <Setter Property="TextAlignment" Value="Right"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
                 <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
             <Style x:Key="WorkspacePanel" TargetType="Border">

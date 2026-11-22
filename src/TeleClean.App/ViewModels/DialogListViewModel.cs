@@ -76,10 +76,10 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     public IReadOnlyList<string> SortOptions { get; } = new[]
     {
-        "По названию (А-Я)",
+        "По названию",
         "По непрочитанным",
-        "По числу участников",
-        "По дате активности"
+        "По участникам",
+        "По активности"
     };
 
     [ObservableProperty]

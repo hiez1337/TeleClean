@@ -20,36 +20,36 @@
                                  Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" Severity="Error" IsClosable="False"/>
                         <ProgressBar Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" IsIndeterminate="True"/>
                         <StackPanel Visibility="{x:Bind ViewModel.IsRecoveryMode, Mode=OneWay}" Spacing="12">
-                            <TextBlock Text="Подключение к Telegram" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                            <TextBlock Text="Подключение к Telegram" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2"/>
                             <TextBlock Text="Сохранённая сессия используется для повторного входа." Style="{StaticResource SupportingText}"/>
-                            <Button Content="Повторить подключение" Command="{x:Bind ViewModel.InitializeCommand}"
+                            <Button Content="Повторить подключение" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.InitializeCommand}"
                                     IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}" Style="{ThemeResource AccentButtonStyle}"/>
                             <HyperlinkButton Content="Настройки подключения" Click="OnProxySettingsClick"
                                              IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
-                            <Button Content="Открыть вход по QR-коду" Command="{x:Bind ViewModel.SwitchToQrModeCommand}"
+                            <Button Content="Войти по QR-коду" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.SwitchToQrModeCommand}"
                                     IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
                         </StackPanel>
                         <Grid x:Name="QrLayout" Visibility="{x:Bind ViewModel.IsQrMode, Mode=OneWay}"
                               ColumnSpacing="24" RowSpacing="16" SizeChanged="OnQrLayoutSizeChanged">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                            <Border Background="White" Width="260" Height="260" CornerRadius="10" HorizontalAlignment="Left">
+                            <Border x:Name="QrTile" Background="White" Width="260" Height="260" CornerRadius="10" HorizontalAlignment="Left">
                                 <Grid>
                                     <Image Source="{x:Bind ViewModel.QrCodeImage, Mode=OneWay}" AutomationProperties.Name="QR-код для входа в Telegram"/>
                                     <ProgressRing Width="28" Height="28" IsActive="{x:Bind ViewModel.IsQrLoading, Mode=OneWay}" RequestedTheme="Light"/>
                                 </Grid>
                             </Border>
                             <StackPanel x:Name="QrInstructions" Grid.Column="1" VerticalAlignment="Center" Spacing="12">
-                                <TextBlock Text="Вход по QR-коду" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
-                                <TextBlock Text="На телефоне откройте Telegram → Настройки → Устройства → Подключить устройство. Наведите камеру на код." Style="{StaticResource SupportingText}"/>
+                                <TextBlock Text="Вход по QR-коду" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2"/>
+                                <TextBlock Text="В Telegram на телефоне откройте «Настройки», затем «Устройства». Нажмите «Подключить устройство» и наведите камеру на код." Style="{StaticResource SupportingText}"/>
                                 <TextBlock Text="{x:Bind ViewModel.QrStatusText, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
-                                <Button Content="Обновить QR-код" Command="{x:Bind ViewModel.StartQrLoginCommand}"/>
-                                <Button Content="Войти по номеру телефона" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
-                                <HyperlinkButton Content="Настройки подключения" Click="OnProxySettingsClick" IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
+                                <Button Content="Обновить QR-код" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.StartQrLoginCommand}"/>
+                                <Button Content="Войти по телефону" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
+                                <HyperlinkButton Content="Настройки подключения" ContentTemplate="{StaticResource WrappingLabel}" Click="OnProxySettingsClick" IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
                             </StackPanel>
                         </Grid>
                         <StackPanel Visibility="{x:Bind ViewModel.IsPhoneMode, Mode=OneWay}" Spacing="12">
-                            <TextBlock Text="Вход по телефону" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                            <TextBlock Text="Вход по телефону" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2"/>
                             <TextBox x:Name="PhoneInput" Header="Номер с кодом страны" InputScope="TelephoneNumber"
                                 Text="{x:Bind ViewModel.PhoneNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                 IsEnabled="{x:Bind ViewModel.IsPhoneInputEnabled, Mode=OneWay}"/>
@@ -60,14 +60,15 @@
                                 <TextBox x:Name="CodeInput" Header="Код подтверждения" InputScope="Number"
                                     Text="{x:Bind ViewModel.PhoneCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                 <Button Content="Подтвердить код" Command="{x:Bind ViewModel.SubmitPhoneCodeCommand}" Style="{ThemeResource AccentButtonStyle}"/>
-                                <Button Content="Изменить номер или запросить новый код" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
+                                <Button Content="Изменить номер или запросить новый код" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
                             </StackPanel>
                             <Button Content="Вернуться к QR-коду" Command="{x:Bind ViewModel.SwitchToQrModeCommand}"/>
                         </StackPanel>
                         <StackPanel Visibility="{x:Bind ViewModel.Is2FaMode, Mode=OneWay}" Spacing="12">
-                            <TextBlock Text="Облачный пароль Telegram" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap"/>
-                            <PasswordBox x:Name="PasswordInput" Header="Пароль двухэтапной аутентификации"
-                                         Password="{x:Bind ViewModel.TwoFactorPassword, Mode=TwoWay}"/>
+                            <TextBlock Text="Облачный пароль Telegram" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2"/>
+                            <PasswordBox x:Name="PasswordInput" Password="{x:Bind ViewModel.TwoFactorPassword, Mode=TwoWay}">
+                                <PasswordBox.Header><TextBlock Text="Пароль двухэтапной аутентификации" TextWrapping="Wrap"/></PasswordBox.Header>
+                            </PasswordBox>
                             <Button Content="Войти" Command="{x:Bind ViewModel.Submit2FaCommand}" Style="{ThemeResource AccentButtonStyle}"/>
                             <Button Content="Вернуться к QR-коду" Command="{x:Bind ViewModel.SwitchToQrModeCommand}"/>
                         </StackPanel>

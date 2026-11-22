@@ -4,7 +4,7 @@
     <ScrollViewer Background="{ThemeResource WorkspaceBrush}" VerticalScrollBarVisibility="Auto"
         HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled"
         HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="14" Padding="24,20" HorizontalAlignment="Stretch">
+        <StackPanel Spacing="14" Padding="24,20" MaxWidth="752" HorizontalAlignment="Stretch">
             <StackPanel Spacing="4">
                 <TextBlock Text="Настройки" Style="{StaticResource WorkspaceTitle}" AutomationProperties.HeadingLevel="Level1"/>
                 <TextBlock Text="Тема, подключение и параметры обработки." Style="{StaticResource SupportingText}"/>
@@ -16,11 +16,12 @@
 
             <Border Style="{StaticResource WorkspacePanel}" Padding="20">
                 <StackPanel Spacing="13">
-                    <TextBlock Text="Оформление" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
-                    <ComboBox Header="Цветовая тема" MinWidth="200" SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}">
+                    <TextBlock Text="Оформление" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2"/>
+                    <ComboBox Header="Цветовая тема" MinWidth="0" HorizontalAlignment="Stretch" MaxWidth="360" SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}">
                         <ComboBoxItem Content="Как в Windows"/><ComboBoxItem Content="Светлая"/><ComboBoxItem Content="Тёмная"/>
                     </ComboBox>
-                    <ComboBox Header="Материал панели навигации" MinWidth="200" SelectedIndex="{x:Bind ViewModel.SelectedBackdropIndex, Mode=TwoWay}">
+                    <ComboBox MinWidth="0" HorizontalAlignment="Stretch" MaxWidth="360" SelectedIndex="{x:Bind ViewModel.SelectedBackdropIndex, Mode=TwoWay}">
+                        <ComboBox.Header><TextBlock Text="Материал панели навигации" TextWrapping="Wrap"/></ComboBox.Header>
                         <ComboBoxItem Content="Mica"/><ComboBoxItem Content="Mica Alt"/><ComboBoxItem Content="Акрил"/>
                     </ComboBox>
                 </StackPanel>
@@ -28,21 +29,22 @@
 
             <Border Style="{StaticResource WorkspacePanel}" Padding="20">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="Массовые операции" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                    <TextBlock Text="Массовые операции" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2"/>
                     <Slider Header="Пауза между запросами" AutomationProperties.Name="Пауза между запросами, секунды"
                         Minimum="1" Maximum="10" StepFrequency="0.5" Value="{x:Bind ViewModel.DelayBetweenRequests, Mode=TwoWay}"/>
                     <TextBlock Text="{x:Bind ViewModel.DelaySecondsText, Mode=OneWay}" Style="{StaticResource SupportingText}"/>
                 </StackPanel>
             </Border>
 
-            <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Header="Подключение и API Telegram">
+            <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Header="Подключение и API Telegram" HeaderTemplate="{StaticResource WrappingLabel}">
                 <StackPanel Spacing="12">
                     <TextBlock Text="Изменения подключения применяются при следующем запуске приложения." Style="{StaticResource SupportingText}"/>
                     <PasswordBox Header="Ссылка MTProxy" Password="{x:Bind ViewModel.ProxyUrl, Mode=TwoWay}" PasswordRevealMode="Peek"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="Сохранить прокси" Command="{x:Bind ViewModel.SaveProxyCommand}"/>
-                        <Button Content="Отключить" Command="{x:Bind ViewModel.ClearProxyCommand}"/>
-                    </StackPanel>
+                    <Grid ColumnSpacing="8" MaxWidth="360" HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Button Content="Сохранить прокси" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.SaveProxyCommand}"/>
+                        <Button Grid.Column="1" Content="Отключить" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.ClearProxyCommand}"/>
+                    </Grid>
                     <NumberBox Header="API ID" Minimum="0" Maximum="2147483647" Value="{x:Bind ViewModel.ApiId, Mode=TwoWay}"/>
                     <PasswordBox Header="API Hash" Password="{x:Bind ViewModel.ApiHash, Mode=TwoWay}"/>
                     <Button Content="Сохранить ключи" Command="{x:Bind ViewModel.SaveApiKeysCommand}"/>
@@ -51,13 +53,13 @@
 
             <Border Style="{StaticResource WorkspacePanel}" Padding="20">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="Данные и сессия" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                    <TextBlock Text="Данные и сессия" Style="{StaticResource SectionTitle}" AutomationProperties.HeadingLevel="Level2"/>
                     <TextBlock Text="Выход завершит текущую сессию TeleClean на этом устройстве." Style="{StaticResource SupportingText}"/>
-                    <Button Content="Очистить кэш аватаров" Command="{x:Bind ViewModel.ClearAvatarCacheCommand}"/>
-                    <Button Content="Выйти из аккаунта" Click="OnConfirmLogout"/>
+                    <Button Content="Очистить кэш аватаров" ContentTemplate="{StaticResource WrappingLabel}" Command="{x:Bind ViewModel.ClearAvatarCacheCommand}"/>
+                    <Button Content="Выйти из аккаунта" ContentTemplate="{StaticResource WrappingLabel}" Click="OnConfirmLogout"/>
                 </StackPanel>
             </Border>
-            <Expander Header="О приложении и локальных данных" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+            <Expander Header="О приложении и локальных данных" HeaderTemplate="{StaticResource WrappingLabel}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                 <StackPanel Spacing="8">
                     <TextBlock Text="{x:Bind ViewModel.AppVersionText}" FontWeight="SemiBold"/>
                     <TextBlock Text="При закрытии окна вход сохраняется. Для завершения сессии используйте «Выйти из аккаунта»." Style="{StaticResource SupportingText}"/>
