@@ -11,8 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: read
+  contents: read
 
 jobs:
   test:
@@ -36,15 +35,10 @@ jobs:
           sudo apt-get install -y libxcb-cursor0 libegl1 libegl-mesa0
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+        run: pip install -r requirements.txt
 
       - name: Run tests
         run: python -m pytest -v --tb=short
-        env:
-          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
-          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
 
   build:
     needs: test

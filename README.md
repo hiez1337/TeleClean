@@ -7,7 +7,7 @@
 ![Python](https://img.shields.io/badge/python-3.12-blue)
 ![PySide6](https://img.shields.io/badge/PySide6-6.11-green)
 ![Telethon](https://img.shields.io/badge/Telethon-1.44-purple)
-![CI](https://github.com/hiez1337/TeleClean/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/hiez1337/TeleClean/actions/workflows/ci.yml/badge.svg?branch=python)
 [![Latest Release](https://img.shields.io/github/v/release/hiez1337/TeleClean)](https://github.com/hiez1337/TeleClean/releases/latest)
 
 **TeleClean** — десктопное приложение для массового выхода из Telegram-каналов, чатов и удаления диалогов с удалёнными аккаунтами.  
@@ -15,7 +15,7 @@
 
 ## Скачать
 
-👉 [**Latest Release**](https://github.com/hiez1337/TeleClean/releases/latest) — `TeleClean.exe` (~78 MB)
+Откройте успешный запуск [CI ветки python](https://github.com/hiez1337/TeleClean/actions/workflows/ci.yml?query=branch%3Apython) и скачайте архив артефакта `TeleClean.exe`.
 
 ## Возможности
 
@@ -30,7 +30,7 @@
 - ✅ **API-ключи встроены** — `.exe` работает сразу после скачивания
 - ✅ **Настройки API** — если ключи не работают, можно ввести свои в интерфейсе
 - ✅ **Информация для отладки** — все пути, статус соединения, версии
-- ✅ **Автосборка** — CI создаёт релиз при каждом пуше в `main`
+- ✅ **Автосборка** — CI проверяет ветку `python` и загружает Windows-сборку как артефакт
 
 ## Как использовать
 

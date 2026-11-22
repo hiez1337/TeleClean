@@ -5,7 +5,8 @@
 pip install -r requirements.txt
 python main.py
 pytest -v --tb=short
-.\build_exe.bat                # produces dist/TeleClean.exe (~78 MB)
+pip install pyinstaller        # required to build the Windows executable
+.\build_exe.bat                # produces dist/TeleClean.exe
 ```
 
 ## Architecture
@@ -46,7 +47,7 @@ main.py → MainWindow → QStackedWidget: [AuthWidget | QTabWidget]
 - `user` / `bot` / `deleted` → `client.delete_dialog()`
 
 ## API keys — priority
-1. `os.getenv("TELEGRAM_API_ID")` — from `.env` (dev) or CI env (test jobs)
+1. `os.getenv("TELEGRAM_API_ID")` — from the process environment or `.env`
 2. `load_api_keys()` — saved via **Settings → API ключи Telegram** in the app, stored in `config.json`
 3. Hardcoded fallback `_BUILD_API_ID = 11600115` in `app/core/telegram_client.py:24`
 
@@ -86,7 +87,7 @@ Use `_run_async(coro, on_result=fn, on_error=fn)` from MainWindow. Both callback
 - Run: `pytest -v --tb=short`
 
 ## PyInstaller build
-Excludes ~40 unused Qt modules to keep `.exe` ~78 MB (vs 278 MB with all modules). See `build_exe.bat` or `.github/workflows/ci.yml` for the full exclude list. CI builds automatically on push to `python`; builds are uploaded as artifacts, without automatic releases.
+Excludes unused Qt modules to keep the executable smaller. Size varies with the installed PySide6 and PyInstaller versions. See `build_exe.bat` or `.github/workflows/ci.yml` for the full exclude list. CI builds automatically on push to `python`; builds are uploaded as artifacts, without automatic releases.
 
 ## Theme (QSS)
 Two files: `telegram_dark.qss` / `telegram_light.qss`, colors from `@xelene/tgui` design tokens. Applies via `QApplication.setStyleSheet()` at startup and on toggle. Saved setting in `config.json`.
