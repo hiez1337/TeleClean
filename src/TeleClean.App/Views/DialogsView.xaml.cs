@@ -29,6 +29,21 @@ public sealed partial class DialogsView : Page
         }
     }
 
+    private void OnWorkspaceSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        bool wide = e.NewSize.Width >= 750;
+        ComparisonHeading.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
+        NameHeading.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
+        SelectVisible.Content = wide ? null : "Выбрать видимые";
+        Grid.SetColumnSpan(SelectVisible, wide ? 1 : 3);
+        Grid.SetColumnSpan(SearchBox, wide ? 1 : 2);
+        Grid.SetColumn(FilterBar, wide ? 1 : 0);
+        Grid.SetColumnSpan(FilterBar, wide ? 1 : 2);
+        Grid.SetRow(FilterBar, wide ? 0 : 1);
+        FilterBar.Margin = wide ? new Thickness(0) : new Thickness(0, 6, 0, 0);
+        ViewModel.ShowComparison = wide;
+    }
+
     private void OnSearchShortcut(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         args.Handled = SearchBox.Focus(FocusState.Keyboard);

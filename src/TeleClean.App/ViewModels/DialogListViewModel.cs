@@ -32,6 +32,19 @@ public sealed partial class DialogListViewModel : ViewModelBase
     private bool _hasFreshDialogs;
     private bool _operationActive;
 
+    private bool _showComparison;
+
+    public bool ShowComparison
+    {
+        get => _showComparison;
+        set
+        {
+            if (_showComparison == value) return;
+            _showComparison = value;
+            foreach (var item in _allDialogs) item.ShowComparison = value;
+        }
+    }
+
     public bool HasRequestedDialogs { get; private set; }
     public bool CanRefresh => !IsBusy && !_operationActive;
     public bool CanSelect => _hasFreshDialogs && CanRefresh;
@@ -313,6 +326,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
             var vm = new DialogItemViewModel(item);
             vm.SelectionChanged += OnItemSelectionChanged;
             vm.SelectionEnabled = CanSelect;
+            vm.ShowComparison = ShowComparison;
             _allDialogs.Add(vm);
         }
 

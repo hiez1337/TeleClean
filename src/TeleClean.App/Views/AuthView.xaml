@@ -3,7 +3,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Background="{ThemeResource WorkspaceBrush}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel MaxWidth="580" Margin="24,30" Spacing="16">
+            <StackPanel MaxWidth="744" Margin="24,24" Spacing="16">
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <Border Width="36" Height="36" Background="{ThemeResource BrandBrush}" CornerRadius="10">
                         <FontIcon Glyph="&#xE724;" FontSize="17" Foreground="{ThemeResource OnBrandBrush}"/>
@@ -19,19 +19,24 @@
                         <InfoBar Title="Вход не завершён" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
                                  Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" Severity="Error" IsClosable="False"/>
                         <ProgressBar Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" IsIndeterminate="True"/>
-                        <StackPanel Visibility="{x:Bind ViewModel.IsQrMode, Mode=OneWay}" Spacing="14">
-                            <TextBlock Text="Вход по QR-коду" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
-                            <TextBlock Text="На телефоне откройте Telegram → Настройки → Устройства → Подключить устройство." Style="{StaticResource SupportingText}"/>
-                            <Border Background="White" Width="164" Height="164" CornerRadius="10" HorizontalAlignment="Left">
+                        <Grid x:Name="QrLayout" Visibility="{x:Bind ViewModel.IsQrMode, Mode=OneWay}"
+                              ColumnSpacing="24" RowSpacing="16" SizeChanged="OnQrLayoutSizeChanged">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Border Background="White" Width="260" Height="260" CornerRadius="10" HorizontalAlignment="Left">
                                 <Grid>
-                                    <Image Source="{x:Bind ViewModel.QrCodeImage, Mode=OneWay}" Margin="8" AutomationProperties.Name="QR-код для входа в Telegram"/>
+                                    <Image Source="{x:Bind ViewModel.QrCodeImage, Mode=OneWay}" AutomationProperties.Name="QR-код для входа в Telegram"/>
                                     <ProgressRing Width="28" Height="28" IsActive="{x:Bind ViewModel.IsQrLoading, Mode=OneWay}" RequestedTheme="Light"/>
                                 </Grid>
                             </Border>
-                            <TextBlock Text="{x:Bind ViewModel.QrStatusText, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
-                            <Button Content="Обновить QR-код" Command="{x:Bind ViewModel.StartQrLoginCommand}"/>
-                            <Button Content="Войти по номеру телефона" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
-                        </StackPanel>
+                            <StackPanel x:Name="QrInstructions" Grid.Column="1" VerticalAlignment="Center" Spacing="12">
+                                <TextBlock Text="Вход по QR-коду" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                                <TextBlock Text="На телефоне откройте Telegram → Настройки → Устройства → Подключить устройство. Наведите камеру на код." Style="{StaticResource SupportingText}"/>
+                                <TextBlock Text="{x:Bind ViewModel.QrStatusText, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
+                                <Button Content="Обновить QR-код" Command="{x:Bind ViewModel.StartQrLoginCommand}"/>
+                                <Button Content="Войти по номеру телефона" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
+                            </StackPanel>
+                        </Grid>
                         <StackPanel Visibility="{x:Bind ViewModel.IsPhoneMode, Mode=OneWay}" Spacing="12">
                             <TextBlock Text="Вход по телефону" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                             <TextBox x:Name="PhoneInput" Header="Номер с кодом страны" InputScope="TelephoneNumber"

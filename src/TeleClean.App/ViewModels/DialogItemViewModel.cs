@@ -19,6 +19,25 @@ public sealed partial class DialogItemViewModel : ObservableObject
     public int ParticipantCount => Model.ParticipantCount;
     public int UnreadCount => Model.UnreadCount;
     public DialogType DialogType => Model.DialogType;
+    public string ParticipantsText => ParticipantCount > 0 ? ParticipantCount.ToString("N0") : "—";
+    public string ActivityDateText => LastActivity?.ToLocalTime().ToString("dd.MM.yyyy") ?? "—";
+    public string DisplayStatus => StatusBadge ?? StatusText;
+
+    private bool _showComparison;
+    public bool ShowComparison
+    {
+        get => _showComparison;
+        set
+        {
+            if (!SetProperty(ref _showComparison, value)) return;
+            OnPropertyChanged(nameof(ShowCompactDetails));
+            OnPropertyChanged(nameof(ShowComparisonUsername));
+        }
+    }
+
+    public bool ShowCompactDetails => !ShowComparison;
+    public bool ShowComparisonUsername => ShowComparison && !string.IsNullOrWhiteSpace(Username);
+
     public string Description
     {
         get
@@ -105,6 +124,7 @@ public sealed partial class DialogItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsDimmed))]
     [NotifyPropertyChangedFor(nameof(IsActive))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(DisplayStatus))]
     private bool _isJoined;
 
     [ObservableProperty]
@@ -116,6 +136,7 @@ public sealed partial class DialogItemViewModel : ObservableObject
     public bool IsDimmed => !IsJoined;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayStatus))]
     private string? _statusBadge;
 
     [ObservableProperty]

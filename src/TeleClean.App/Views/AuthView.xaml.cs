@@ -32,6 +32,14 @@ public sealed partial class AuthView : UserControl
         };
     }
 
+    private void OnQrLayoutSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        bool stacked = e.NewSize.Width < 544;
+        Grid.SetColumn(QrInstructions, stacked ? 0 : 1);
+        Grid.SetColumnSpan(QrInstructions, stacked ? 2 : 1);
+        Grid.SetRow(QrInstructions, stacked ? 1 : 0);
+    }
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         await ViewModel.InitializeAsync();
