@@ -29,6 +29,8 @@ public sealed class FakeTelegramService : ITelegramService
     public TimeSpan? RateLimitRetryAfter { get; set; }
     public Func<DialogItem, CancellationToken, Task<LeaveResult>>? LeaveHandler { get; set; }
 
+    public Func<CancellationToken, Task<IReadOnlyList<DialogItem>>>? FetchDialogsHandler { get; set; }
+
     public bool ResetSessionCalled { get; private set; }
 
     public void SetDialogs(IEnumerable<DialogItem> dialogs)
@@ -117,6 +119,7 @@ public sealed class FakeTelegramService : ITelegramService
 
     public Task<IReadOnlyList<DialogItem>> FetchDialogsAsync(CancellationToken ct = default)
     {
+        if (FetchDialogsHandler != null) return FetchDialogsHandler(ct);
         return Task.FromResult<IReadOnlyList<DialogItem>>(_dialogs.Select(d => d.Clone()).ToList());
     }
 

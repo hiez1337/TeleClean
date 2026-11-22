@@ -29,6 +29,8 @@ public sealed partial class DialogListViewModel : ViewModelBase
     private readonly IBulkExecutionEngine _engine;
     private readonly List<DialogItemViewModel> _allDialogs = new();
     private CancellationTokenSource? _avatarLoad;
+    private CancellationTokenSource? _dialogLoad;
+    private bool _disposed;
     private bool _hasFreshDialogs;
     private bool _operationActive;
 
@@ -46,7 +48,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
     }
 
     public bool HasRequestedDialogs { get; private set; }
-    public bool CanRefresh => !IsBusy && !_operationActive;
+    public bool CanRefresh => !_disposed && !IsBusy && !_operationActive;
     public bool CanSelectVisible => CanSelect && VisibleDialogs.Any(dialog => dialog.IsJoined);
     public bool CanSelect => _hasFreshDialogs && CanRefresh;
     public bool HasFilters => !string.IsNullOrWhiteSpace(SearchQuery) || SelectedFilterIndex != 0;
@@ -264,6 +266,9 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     public void ResetAccount()
     {
+        _dialogLoad?.Cancel();
+        _dialogLoad = null;
+        IsBusy = false;
         _avatarLoad?.Cancel();
         HasRequestedDialogs = false;
         _hasFreshDialogs = false;
@@ -274,9 +279,9 @@ public sealed partial class DialogListViewModel : ViewModelBase
         SetDialogs(Array.Empty<DialogItem>());
     }
 
-    private async Task PersistDialogsAsync()
+    private async Task PersistDialogsAsync(CancellationToken ct = default)
     {
-        try { await _cacheService.SaveDialogCacheAsync(_allDialogs.Select(d => d.Model.Clone()).ToArray()); }
+        try { await _cacheService.SaveDialogCacheAsync(_allDialogs.Select(d => d.Model.Clone()).ToArray(), ct); }
         catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
         {
             StatusMessage = "Не удалось сохранить локальную копию списка.";
@@ -289,6 +294,9 @@ public sealed partial class DialogListViewModel : ViewModelBase
     public async Task LoadDialogsAsync()
     {
         if (!CanRefresh) return;
+        var source = new CancellationTokenSource();
+        _dialogLoad = source;
+        var ct = source.Token;
         IsBusy = true;
         foreach (var item in _allDialogs) item.SelectionEnabled = false;
         _hasFreshDialogs = false;
@@ -302,28 +310,39 @@ public sealed partial class DialogListViewModel : ViewModelBase
             if (!HasRequestedDialogs)
             {
                 HasRequestedDialogs = true;
-                SetDialogs(await _cacheService.LoadDialogCacheAsync());
+                var cached = await _cacheService.LoadDialogCacheAsync(ct);
+                ct.ThrowIfCancellationRequested();
+                SetDialogs(cached);
             }
 
-            var remote = await _telegramService.FetchDialogsAsync();
+            var remote = await _telegramService.FetchDialogsAsync(ct);
+            ct.ThrowIfCancellationRequested();
             SetDialogs(remote);
             _hasFreshDialogs = true;
             StatusMessage = "Список обновлён";
-            await PersistDialogsAsync();
+            await PersistDialogsAsync(ct);
+            ct.ThrowIfCancellationRequested();
 
             _avatarLoad = new CancellationTokenSource();
             _ = FetchAvatarsInBackgroundAsync(_allDialogs.ToArray(), _avatarLoad);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch
         {
+            if (ct.IsCancellationRequested) return;
             StatusMessage = VisibleDialogs.Count > 0 ? "Показана локальная копия. Для действий обновите список." : null;
             ErrorMessage = "Не удалось загрузить диалоги. Проверьте подключение и нажмите «Обновить».";
         }
         finally
         {
-            IsBusy = false;
-            foreach (var item in _allDialogs) item.SelectionEnabled = CanSelect;
-            UpdateCountersAndActionButton();
+            if (ReferenceEquals(_dialogLoad, source))
+            {
+                _dialogLoad = null;
+                IsBusy = false;
+                foreach (var item in _allDialogs) item.SelectionEnabled = CanSelect;
+                UpdateCountersAndActionButton();
+            }
+            source.Dispose();
         }
     }
 
@@ -564,6 +583,10 @@ public sealed partial class DialogListViewModel : ViewModelBase
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (System.IO.IOException) { }
         catch (UnauthorizedAccessException) { }
+        catch (Exception)
+        {
+            // Avatar failure is non-fatal, but every fire-and-forget task must observe its exceptions.
+        }
         finally
         {
             if (ReferenceEquals(_avatarLoad, source)) _avatarLoad = null;
@@ -583,6 +606,8 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     public override void Dispose()
     {
+        _disposed = true;
+        _dialogLoad?.Cancel();
         _avatarLoad?.Cancel();
         _engine.LogEntryAdded -= OnEngineLogEntryAdded;
         _engine.ProgressChanged -= OnEngineProgressChanged;

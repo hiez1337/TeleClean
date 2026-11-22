@@ -160,14 +160,10 @@ public sealed class ConfigService : IConfigService
         ArgumentNullException.ThrowIfNull(config);
         var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
         var path = GetConfigFilePath();
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-
         await _fileLock.WaitAsync(ct);
         try
         {
-            await File.WriteAllTextAsync(temporary, json, ct);
-            File.Move(temporary, path, overwrite: true);
+            await AtomicFile.WriteTextAsync(path, json, ct);
             lock (_lock)
             {
                 _currentConfig = config;
@@ -177,7 +173,6 @@ public sealed class ConfigService : IConfigService
         finally
         {
             _fileLock.Release();
-            File.Delete(temporary);
         }
     }
 

@@ -1,5 +1,6 @@
 **/bin/
 **/obj/
+**/TestResults/
 .vs/
 .vscode/
 .env*
@@ -10,8 +11,10 @@
 config.json
 channel_cache.json
 leave_history.json
+leave_history.jsonl
 artifacts/
 
 __pycache__/
 *.pyc
 .pytest_cache/
+/*.exe

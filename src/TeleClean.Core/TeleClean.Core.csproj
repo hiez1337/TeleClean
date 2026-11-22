@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="WTelegramClient" Version="4.4.8" />
+    <InternalsVisibleTo Include="TeleClean.Tests" />
   </ItemGroup>
 
 </Project>
