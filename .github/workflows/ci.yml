@@ -17,7 +17,7 @@ jobs:
           dotnet-version: '8.0.x'
       - run: dotnet test src/TeleClean.Tests/TeleClean.Tests.csproj -c Release --logger trx
       - name: Publish self-contained Windows executable
-        run: dotnet publish src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64 -p:PublishProfile=WinX64 --artifacts-path artifacts/single-file-build -o artifacts/publish
+        run: dotnet publish src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64 -p:PublishProfile=WinX64 -p:DebugType=none --artifacts-path artifacts/single-file-build -o artifacts/publish
       - name: Stage TeleClean.exe
         shell: pwsh
         run: |

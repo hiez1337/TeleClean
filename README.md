@@ -23,7 +23,7 @@ dotnet build src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64
 Для публикации одного EXE используйте профиль `WinX64`:
 
 ```powershell
-dotnet publish src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64 -p:PublishProfile=WinX64 --artifacts-path artifacts/single-file-build -o artifacts/publish
+dotnet publish src/TeleClean.App/TeleClean.App.csproj -c Release -p:Platform=x64 -p:PublishProfile=WinX64 -p:DebugType=none --artifacts-path artifacts/single-file-build -o artifacts/publish
 Copy-Item artifacts/publish/TeleClean.App.exe artifacts/TeleClean.exe
 ```
 
