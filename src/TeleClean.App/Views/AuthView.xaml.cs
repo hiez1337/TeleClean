@@ -17,6 +17,27 @@ public sealed partial class AuthView : UserControl
         InitializeComponent();
         ViewModel = App.Services.GetRequiredService<AuthViewModel>();
         Loaded += OnLoaded;
+        ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(AuthViewModel.CurrentMode)) return;
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                switch (ViewModel.CurrentMode)
+                {
+                    case AuthMode.PhoneInput: PhoneInput.Focus(FocusState.Programmatic); break;
+                    case AuthMode.CodeInput: CodeInput.Focus(FocusState.Programmatic); break;
+                    case AuthMode.TwoFactor: PasswordInput.Focus(FocusState.Programmatic); break;
+                }
+            });
+        };
+    }
+
+    private void OnQrLayoutSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        bool stacked = e.NewSize.Width < 544;
+        Grid.SetColumn(QrInstructions, stacked ? 0 : 1);
+        Grid.SetColumnSpan(QrInstructions, stacked ? 2 : 1);
+        Grid.SetRow(QrInstructions, stacked ? 1 : 0);
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -33,12 +54,12 @@ public sealed partial class AuthView : UserControl
         var configService = App.Services.GetRequiredService<IConfigService>();
         var config = await configService.LoadConfigAsync();
 
-        var proxyBox = new TextBox
+        var proxyBox = new PasswordBox
         {
             Header = "MTProxy URL",
             PlaceholderText = "tg://proxy?server=...&port=...&secret=...  или  https://t.me/proxy?...",
-            Text = config.ProxyUrl ?? string.Empty,
-            IsSpellCheckEnabled = false,
+            Password = config.ProxyUrl ?? string.Empty,
+            PasswordRevealMode = PasswordRevealMode.Peek,
             FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
             Margin = new Thickness(0, 8, 0, 0)
         };
@@ -47,7 +68,6 @@ public sealed partial class AuthView : UserControl
         {
             Text = "Если Telegram заблокирован провайдером — вставьте ссылку MTProxy.\nОставьте поле пустым для прямого подключения.",
             FontSize = 12,
-            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
             TextWrapping = TextWrapping.Wrap
         };
 
@@ -62,22 +82,25 @@ public sealed partial class AuthView : UserControl
             PrimaryButtonText = "Сохранить",
             CloseButtonText = "Отмена",
             DefaultButton = ContentDialogButton.Primary,
+            RequestedTheme = ActualTheme,
             XamlRoot = XamlRoot
         };
 
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary)
         {
-            config.ProxyUrl = string.IsNullOrWhiteSpace(proxyBox.Text) ? null : proxyBox.Text.Trim();
-            await configService.SaveConfigAsync(config);
-
-            // Dispose existing client so next auth call recreates it with the new proxy
-            var telegramService = App.Services.GetRequiredService<ITelegramService>();
-            await telegramService.RecreateClientAsync();
-
-            // Restart QR login — new client will be created with updated proxy
-            ViewModel.StartQrLogin();
+            try
+            {
+                config.ProxyUrl = string.IsNullOrWhiteSpace(proxyBox.Password) ? null : proxyBox.Password.Trim();
+                await configService.SaveConfigAsync(config);
+                ViewModel.CancelQrLogin();
+                await App.Services.GetRequiredService<ITelegramService>().RecreateClientAsync();
+                ViewModel.StartQrLogin();
+            }
+            catch
+            {
+                ViewModel.ErrorMessage = "Не удалось применить настройки подключения. Повторите попытку.";
+            }
         }
     }
 }
-

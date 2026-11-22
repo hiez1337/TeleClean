@@ -16,7 +16,26 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
     private BulkOperationState _state = BulkOperationState.Idle;
     private volatile bool _isStopped;
     private volatile bool _isPaused;
-    private readonly ManualResetEventSlim _pauseEvent = new(true);
+    private bool _isRunning;
+    private int _processed;
+    private int _total;
+    private string _title = string.Empty;
+    private int _succeeded;
+    private int _failed;
+
+    private void Publish(int seconds = 0) => ProgressChanged?.Invoke(this,
+        new BulkProgressReport(_processed, _total, _title, State, seconds, _succeeded, _failed));
+
+    private async Task PublishResultAsync(BulkLogEntry entry)
+    {
+        LogEntryAdded?.Invoke(this, entry);
+        try { await _cacheService.AppendHistoryAsync(entry); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            LogEntryAdded?.Invoke(this, new BulkLogEntry(DateTime.UtcNow, 0, string.Empty,
+                LeaveResult.Error, "Не удалось сохранить запись в локальном журнале."));
+        }
+    }
 
     public BulkOperationState State
     {
@@ -54,189 +73,112 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
         ArgumentNullException.ThrowIfNull(items);
 
         var list = items.ToList();
-        if (list.Count == 0)
-        {
-            State = BulkOperationState.Completed;
-            ProgressChanged?.Invoke(this, new BulkProgressReport(0, 0, string.Empty, BulkOperationState.Completed, 0));
-            return;
-        }
-
         lock (_stateLock)
         {
-            if (_state is BulkOperationState.Running or BulkOperationState.Paused or BulkOperationState.RateLimited)
-            {
+            if (_isRunning)
                 throw new InvalidOperationException("A bulk operation is already in progress.");
-            }
 
+            _isRunning = true;
             _state = BulkOperationState.Running;
             _isStopped = false;
             _isPaused = false;
-            _pauseEvent.Set();
         }
 
-        int total = list.Count;
-        int successCount = 0;
-        int errorCount = 0;
+        _total = list.Count;
+        _processed = _succeeded = _failed = 0;
+        _title = string.Empty;
+        bool completed = false;
 
         try
         {
-            for (int i = 0; i < total; i++)
+            for (int i = 0; i < _total; i++)
             {
-                // Check cancellation or stop signal
-                if (_isStopped || ct.IsCancellationRequested)
-                {
-                    State = BulkOperationState.Interrupted;
-                    var stopEntry = new BulkLogEntry(
-                        DateTime.UtcNow, 0, string.Empty, LeaveResult.Error, "Операция прервана пользователем.");
-                    LogEntryAdded?.Invoke(this, stopEntry);
-                    break;
-                }
-
-                // Wait if paused
-                while (_isPaused && !_isStopped && !ct.IsCancellationRequested)
-                {
-                    await Task.Delay(150, ct);
-                }
-
-                if (_isStopped || ct.IsCancellationRequested)
-                {
-                    State = BulkOperationState.Interrupted;
-                    break;
-                }
+                while (_isPaused && !_isStopped)
+                    await Task.Delay(100, ct);
+                if (_isStopped) break;
+                ct.ThrowIfCancellationRequested();
 
                 var item = list[i];
-                int estimatedRemaining = (total - i) * (int)Math.Max(1, delayBetween.TotalSeconds);
+                _title = item.Title;
+                Publish();
+                if (_isStopped) break;
+                ct.ThrowIfCancellationRequested();
 
-                // Report progress for current item
-                ProgressChanged?.Invoke(this, new BulkProgressReport(
-                    currentIndex: i + 1,
-                    totalCount: total,
-                    currentTitle: item.Title,
-                    state: State,
-                    secondsRemaining: estimatedRemaining,
-                    successCount: successCount,
-                    errorCount: errorCount
-                ));
-
-                // Execute leave/delete via TelegramService
-                string actionName = item.DialogType switch
+                string action = item.DialogType switch
                 {
-                    DialogType.Deleted => "Удаление диалога",
-                    DialogType.Bot => "Остановка бота",
+                    DialogType.Bot or DialogType.User or DialogType.Deleted => "Удаление диалога",
                     DialogType.Supergroup or DialogType.Group => "Выход из чата",
                     _ => "Выход из канала"
                 };
-
                 var result = await _telegramService.LeaveDialogAsync(item, ct);
-
+                _processed++;
                 if (result == LeaveResult.Success)
                 {
-                    successCount++;
-                    item.StatusBadge = item.DialogType == DialogType.Deleted ? "🗑 Удален" : "✅ Вышел";
+                    _succeeded++;
+                    item.StatusBadge = item.DialogType is DialogType.Bot or DialogType.User or DialogType.Deleted
+                        ? "Удалён" : "✅ Вышел";
                     item.IsJoined = false;
-
-                    var log = new BulkLogEntry(
-                        DateTime.UtcNow, item.Id, item.Title, LeaveResult.Success, $"Успешно: {item.Title}", actionName);
-                    LogEntryAdded?.Invoke(this, log);
-                    await _cacheService.AppendHistoryAsync(log, ct);
-                }
-                else if (result == LeaveResult.RateLimited)
-                {
-                    errorCount++;
-                    item.StatusBadge = "⏳ Ограничение";
-
-                    State = BulkOperationState.RateLimited;
-                    var log = new BulkLogEntry(
-                        DateTime.UtcNow, item.Id, item.Title, LeaveResult.RateLimited,
-                        $"⏳ Превышен лимит запросов (Rate Limit). Ожидание {(int)rateLimitDelay.TotalSeconds} сек...", actionName);
-                    LogEntryAdded?.Invoke(this, log);
-                    await _cacheService.AppendHistoryAsync(log, ct);
-
-                    // Backoff loop
-                    int waitSec = (int)Math.Max(1, rateLimitDelay.TotalSeconds);
-                    for (int s = waitSec; s > 0; s--)
-                    {
-                        if (_isStopped || ct.IsCancellationRequested) break;
-                        ProgressChanged?.Invoke(this, new BulkProgressReport(
-                            currentIndex: i + 1,
-                            totalCount: total,
-                            currentTitle: item.Title,
-                            state: BulkOperationState.RateLimited,
-                            secondsRemaining: s,
-                            successCount: successCount,
-                            errorCount: errorCount
-                        ));
-                        await Task.Delay(1000, ct);
-                    }
-
-                    if (!_isStopped && !ct.IsCancellationRequested)
-                    {
-                        State = BulkOperationState.Running;
-                    }
                 }
                 else
                 {
-                    errorCount++;
+                    _failed++;
                     item.StatusBadge = result switch
                     {
-                        LeaveResult.Forbidden => "⛔ Нет доступа",
-                        LeaveResult.NotFound => "❓ Не найден",
-                        _ => "❌ Ошибка"
+                        LeaveResult.RateLimited => "⏳ Ограничение",
+                        LeaveResult.Forbidden => "Нет доступа",
+                        LeaveResult.NotFound => "Не найден",
+                        _ => "Ошибка"
                     };
-
-                    var log = new BulkLogEntry(
-                        DateTime.UtcNow, item.Id, item.Title, result,
-                        $"{item.StatusBadge}: {item.Title}", actionName);
-                    LogEntryAdded?.Invoke(this, log);
-                    await _cacheService.AppendHistoryAsync(log, ct);
                 }
 
-                // Pacing delay between actions
-                if (result == LeaveResult.Success && i < total - 1 && !_isStopped && !ct.IsCancellationRequested)
+                await PublishResultAsync(new BulkLogEntry(DateTime.UtcNow, item.Id, item.Title,
+                    result, $"{item.StatusBadge}: {item.Title}", action) { DialogType = item.DialogType });
+
+                if (result == LeaveResult.RateLimited)
                 {
-                    int delaySeconds = (int)Math.Max(0, delayBetween.TotalSeconds);
-                    for (int d = delaySeconds; d > 0; d--)
+                    State = BulkOperationState.RateLimited;
+                    var retryAfter = _telegramService.RateLimitRetryAfter ?? TimeSpan.Zero;
+                    var wait = Math.Max(rateLimitDelay.TotalSeconds, retryAfter.TotalSeconds);
+                    for (int seconds = (int)Math.Max(1, wait); seconds > 0 && !_isStopped; seconds--)
                     {
-                        if (_isStopped || ct.IsCancellationRequested) break;
+                        Publish(seconds);
                         await Task.Delay(1000, ct);
                     }
+
+                    if (!_isStopped) State = _isPaused ? BulkOperationState.Paused : BulkOperationState.Running;
+                }
+                else
+                {
+                    Publish();
+                    if (i < _total - 1 && !_isStopped)
+                        await Task.Delay(delayBetween, ct);
                 }
             }
 
-            if (!_isStopped && !ct.IsCancellationRequested)
-            {
-                State = BulkOperationState.Completed;
-                var summary = new BulkLogEntry(
-                    DateTime.UtcNow, 0, string.Empty, LeaveResult.Success,
-                    $"Операция завершена. Успешно: {successCount}, Ошибок: {errorCount}");
-                LogEntryAdded?.Invoke(this, summary);
-
-                ProgressChanged?.Invoke(this, new BulkProgressReport(
-                    currentIndex: total,
-                    totalCount: total,
-                    currentTitle: string.Empty,
-                    state: BulkOperationState.Completed,
-                    secondsRemaining: 0,
-                    successCount: successCount,
-                    errorCount: errorCount
-                ));
-            }
+            completed = !_isStopped && !ct.IsCancellationRequested;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            State = BulkOperationState.Interrupted;
-            var stopEntry = new BulkLogEntry(
-                DateTime.UtcNow, 0, string.Empty, LeaveResult.Error, "Операция отменена.");
-            LogEntryAdded?.Invoke(this, stopEntry);
+            // Record the completed prefix even when the user stops during a wait.
         }
         finally
         {
-            lock (_stateLock)
+            try
             {
-                if (_state != BulkOperationState.Interrupted && _state != BulkOperationState.Completed)
+                State = completed ? BulkOperationState.Completed : BulkOperationState.Interrupted;
+                _title = string.Empty;
+                if (_total > 0)
                 {
-                    _state = BulkOperationState.Idle;
+                    var summary = completed ? "Операция завершена" : "Операция прервана";
+                    LogEntryAdded?.Invoke(this, new BulkLogEntry(DateTime.UtcNow, 0, string.Empty,
+                        completed ? LeaveResult.Success : LeaveResult.Error,
+                        $"{summary}. Успешно: {_succeeded}, ошибок: {_failed}"));
                 }
+                Publish();
+            }
+            finally
+            {
+                lock (_stateLock) _isRunning = false;
             }
         }
     }
@@ -248,41 +190,32 @@ public sealed class BulkExecutionEngine : IBulkExecutionEngine
             if (_state == BulkOperationState.Running)
             {
                 _isPaused = true;
-                _pauseEvent.Reset();
                 _state = BulkOperationState.Paused;
 
-                var log = new BulkLogEntry(
-                    DateTime.UtcNow, 0, string.Empty, LeaveResult.Success, "Операция приостановлена.");
-                LogEntryAdded?.Invoke(this, log);
             }
+            else return;
         }
+        Publish();
     }
 
     public void Resume()
     {
         lock (_stateLock)
         {
-            if (_state == BulkOperationState.Paused)
-            {
-                _isPaused = false;
-                _pauseEvent.Set();
-                _state = BulkOperationState.Running;
-
-                var log = new BulkLogEntry(
-                    DateTime.UtcNow, 0, string.Empty, LeaveResult.Success, "Операция возобновлена.");
-                LogEntryAdded?.Invoke(this, log);
-            }
+            if (_state != BulkOperationState.Paused) return;
+            _isPaused = false;
+            _state = BulkOperationState.Running;
         }
+        Publish();
     }
 
     public void Stop()
     {
         lock (_stateLock)
         {
+            if (!_isRunning) return;
             _isStopped = true;
             _isPaused = false;
-            _pauseEvent.Set();
-            _state = BulkOperationState.Interrupted;
         }
     }
 }

@@ -13,6 +13,9 @@ public sealed class BulkLogEntry
     [JsonPropertyName("dialog_id")]
     public long DialogId { get; set; }
 
+    [JsonPropertyName("dialog_type")]
+    public DialogType? DialogType { get; set; }
+
     [JsonPropertyName("title")]
     public string Title { get; set; } = string.Empty;
 

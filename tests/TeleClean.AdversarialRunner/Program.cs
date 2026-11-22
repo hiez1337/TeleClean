@@ -974,7 +974,7 @@ internal class FakeTelegramService : ITelegramService
         return LeaveResult.Success;
     }
 
-    public Task<string?> DownloadAvatarAsync(long dialogId, CancellationToken ct = default) => Task.FromResult<string?>(null);
+    public Task<string?> DownloadAvatarAsync(DialogItem dialog, CancellationToken ct = default) => Task.FromResult<string?>(null);
 }
 
 internal class FakeCacheService : ICacheService

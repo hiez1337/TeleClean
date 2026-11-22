@@ -33,10 +33,11 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     [NotifyPropertyChangedFor(nameof(OperationsHeaderText))]
     private int _activeOperationsCount = 0;
 
-    public string OperationsHeaderText => $"Операции ({ActiveOperationsCount})";
+    public string OperationsHeaderText => IsOperationActive ? $"Операции ({ActiveOperationsCount})" : "Операции";
 
     public ObservableCollection<BulkLogEntry> LogEntries { get; } = new();
     public ObservableCollection<BulkLogEntry> Logs => LogEntries;
+    public bool HasLogs => LogEntries.Count > 0;
 
     [ObservableProperty]
     private int _currentIndex;
@@ -82,12 +83,14 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     [ObservableProperty]
     private string _successErrorCounterText = "Успешно: 0 | Ошибок: 0";
 
+    public bool IsOperationActive => _executionCts != null;
     public bool IsWaitingOnRateLimit => CurrentState == BulkOperationState.RateLimited;
     public bool CanPause => CurrentState == BulkOperationState.Running;
     public bool CanResume => CurrentState == BulkOperationState.Paused;
     public bool CanTogglePause => CanPause || CanResume;
-    public bool CanStop => CurrentState is BulkOperationState.Running or BulkOperationState.Paused or BulkOperationState.RateLimited;
-    public string PauseButtonText => CurrentState == BulkOperationState.Paused ? "▶ Продолжить" : "⏸ Пауза";
+    public bool CanStop => _executionCts is { IsCancellationRequested: false } &&
+        CurrentState is BulkOperationState.Running or BulkOperationState.Paused or BulkOperationState.RateLimited;
+    public string PauseButtonText => CurrentState == BulkOperationState.Paused ? "Продолжить" : "Пауза";
 
     public BulkExecutionViewModel(
         IBulkExecutionEngine engine,
@@ -114,14 +117,16 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
 
     public async Task StartExecutionAsync(IReadOnlyList<DialogItem> items)
     {
-        _engine.Stop();
-        _executionCts?.Cancel();
-        _executionCts?.Dispose();
+        if (_executionCts != null) return;
+        ErrorMessage = null;
         _executionCts = new CancellationTokenSource();
         var ct = _executionCts.Token;
+        OnPropertyChanged(nameof(IsOperationActive));
+        OnPropertyChanged(nameof(OperationsHeaderText));
 
         LogEntries.Clear();
         OnPropertyChanged(nameof(Logs));
+        OnPropertyChanged(nameof(HasLogs));
         CurrentIndex = 0;
         TotalCount = items.Count;
         ActiveOperationsCount = items.Count;
@@ -146,28 +151,38 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
             });
         }, null, 0, 500);
 
-        var config = await _configService.LoadConfigAsync();
-        var delay = TimeSpan.FromSeconds(config.DefaultDelaySeconds > 0 ? config.DefaultDelaySeconds : 3.0);
-        var rateLimitDelay = TimeSpan.FromSeconds(30);
-
-        _ = Task.Run(async () =>
+        try
         {
-            try
-            {
-                await _engine.StartAsync(items, delay, rateLimitDelay, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                // Clean user stop
-            }
-            catch (Exception ex)
-            {
-                Dispatcher.Enqueue(() =>
-                {
-                    ErrorMessage = $"Ошибка выполнения операции: {ex.Message}";
-                });
-            }
-        }, ct);
+            var config = await _configService.LoadConfigAsync(ct);
+            var seconds = config.DefaultDelaySeconds;
+            var delay = TimeSpan.FromSeconds(double.IsFinite(seconds) && seconds >= 0 && seconds <= 60 ? seconds : 3);
+            await Task.Run(() => _engine.StartAsync(items, delay, TimeSpan.FromSeconds(30), ct));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            CurrentState = BulkOperationState.Interrupted;
+            StateBadgeText = "Остановлено";
+            CurrentStatusDescription = "Операция остановлена.";
+        }
+        catch
+        {
+            CurrentState = BulkOperationState.Interrupted;
+            StateBadgeText = "Прервано";
+            ErrorMessage = "Не удалось выполнить операцию. Проверьте журнал и обновите список.";
+        }
+        finally
+        {
+            _stopwatch.Stop();
+            _elapsedTimer?.Dispose();
+            _elapsedTimer = null;
+            ActiveOperationsCount = 0;
+            _executionCts.Dispose();
+            _executionCts = null;
+            OnPropertyChanged(nameof(IsOperationActive));
+            OnPropertyChanged(nameof(OperationsHeaderText));
+            OnPropertyChanged(nameof(CanStop));
+
+        }
     }
 
     private void OnEngineProgressChanged(object? sender, BulkProgressReport report)
@@ -212,12 +227,12 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
                     break;
 
                 case BulkOperationState.RateLimited:
-                    CurrentStatusDescription = $"Ограничение Telegram (FloodWait). Ожидание {SecondsRemaining} сек...";
-                    StateBadgeText = $"FloodWait ({SecondsRemaining}с)";
+                    CurrentStatusDescription = $"Telegram ограничил запросы. Продолжим через {SecondsRemaining} с.";
+                    StateBadgeText = $"Пауза Telegram · {SecondsRemaining} с";
                     break;
 
                 case BulkOperationState.Completed:
-                    CurrentStatusDescription = $"Операция успешно завершена. Успешно: {SuccessCount}, ошибок: {ErrorCount}";
+                    CurrentStatusDescription = $"Операция завершена. Успешно: {SuccessCount}, ошибок: {ErrorCount}";
                     StateBadgeText = "Завершено";
                     break;
 
@@ -239,6 +254,7 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
         {
             LogEntries.Add(log);
             OnPropertyChanged(nameof(Logs));
+            OnPropertyChanged(nameof(HasLogs));
             if (LogEntries.Count > 1000)
             {
                 LogEntries.RemoveAt(0);
@@ -264,12 +280,10 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     [RelayCommand]
     public void Stop()
     {
-        _stopwatch.Stop();
-        _elapsedTimer?.Dispose();
-        _elapsedTimer = null;
-        ActiveOperationsCount = 0;
+        CurrentStatusDescription = "Остановка после текущего запроса…";
         _engine.Stop();
         _executionCts?.Cancel();
+        OnPropertyChanged(nameof(CanStop));
     }
 
     [RelayCommand]

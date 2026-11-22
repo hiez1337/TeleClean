@@ -26,6 +26,9 @@ public sealed class FakeTelegramService : ITelegramService
     public Func<string, CancellationToken, Task<string>>? SubmitPasswordHandler { get; set; }
     public Func<long, CancellationToken, Task<string?>>? DownloadAvatarHandler { get; set; }
 
+    public TimeSpan? RateLimitRetryAfter { get; set; }
+    public Func<DialogItem, CancellationToken, Task<LeaveResult>>? LeaveHandler { get; set; }
+
     public bool ResetSessionCalled { get; private set; }
 
     public void SetDialogs(IEnumerable<DialogItem> dialogs)
@@ -121,6 +124,7 @@ public sealed class FakeTelegramService : ITelegramService
     {
         ArgumentNullException.ThrowIfNull(dialog);
         _leaveCalls.Add((dialog.Id, dialog.DialogType));
+        if (LeaveHandler != null) return LeaveHandler(dialog, ct);
 
         if (_configuredLeaveResults.TryGetValue(dialog.Id, out var result))
         {
@@ -138,12 +142,12 @@ public sealed class FakeTelegramService : ITelegramService
         return Task.FromResult(DefaultLeaveResult);
     }
 
-    public Task<string?> DownloadAvatarAsync(long dialogId, CancellationToken ct = default)
+    public Task<string?> DownloadAvatarAsync(DialogItem dialog, CancellationToken ct = default)
     {
         if (DownloadAvatarHandler != null)
         {
-            return DownloadAvatarHandler(dialogId, ct);
+            return DownloadAvatarHandler(dialog.Id, ct);
         }
-        return Task.FromResult<string?>($"/fake/avatars/{dialogId}.jpg");
+        return Task.FromResult<string?>($"/fake/avatars/{dialog.Id}.jpg");
     }
 }

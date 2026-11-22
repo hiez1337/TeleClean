@@ -40,6 +40,15 @@ public sealed class DialogItem
     [JsonPropertyName("is_active")]
     public bool IsActive { get; set; } = true;
 
+    // Negative keys isolate the new cache from legacy files named by bare positive IDs.
+    [JsonIgnore]
+    public long AvatarCacheKey => checked(-Id * 3 - (DialogType switch
+    {
+        DialogType.Channel or DialogType.Supergroup => 0,
+        DialogType.Group => 1,
+        _ => 2
+    }));
+
     [JsonIgnore]
     public bool IsSelected { get; set; }
 

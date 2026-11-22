@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -56,9 +57,6 @@ public sealed partial class AuthViewModel : ViewModelBase,
     private ImageSource? _qrCodeImage;
 
     [ObservableProperty]
-    private string? _lastQrUrl;
-
-    [ObservableProperty]
     private bool _isAuthenticated;
 
     public bool IsQrMode => CurrentMode == AuthMode.QrCode;
@@ -102,11 +100,13 @@ public sealed partial class AuthViewModel : ViewModelBase,
                 return;
             }
 
+            IsBusy = false;
             StartQrLogin();
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Ошибка проверки сессии: {ex.Message}";
+            IsBusy = false;
             StartQrLogin();
         }
         finally
@@ -119,29 +119,29 @@ public sealed partial class AuthViewModel : ViewModelBase,
     [RelayCommand]
     public void StartQrLogin()
     {
+        if (IsBusy) return;
         CancelQrLogin();
         CurrentMode = AuthMode.QrCode;
+        QrCodeImage = null;
         IsQrLoading = true;
         ErrorMessage = null;
         QrStatusText = "Генерация QR-кода...";
 
-        _qrCts = new CancellationTokenSource();
-        var ct = _qrCts.Token;
+        var source = new CancellationTokenSource();
+        _qrCts = source;
+        var ct = source.Token;
 
         _ = Task.Run(async () =>
         {
             try
             {
                 string result = await _telegramService.BeginLoginWithQrAsync(
-                    async qrUrl =>
-                    {
-                        LastQrUrl = qrUrl;
-                        await HandleQrUrlGeneratedAsync(qrUrl);
-                    },
+                    qrUrl => HandleQrUrlGenerated(qrUrl, ct),
                     onPasswordNeeded: () =>
                     {
                         Dispatcher.Enqueue(() =>
                         {
+                            if (ct.IsCancellationRequested) return;
                             CurrentMode = AuthMode.TwoFactor;
                             StatusMessage = "Требуется пароль двухфакторной аутентификации (2FA).";
                         });
@@ -152,12 +152,13 @@ public sealed partial class AuthViewModel : ViewModelBase,
 
                 if (result == "LOGIN_SUCCESS")
                 {
-                    Dispatcher.Enqueue(OnAuthenticationSuccess);
+                    Dispatcher.Enqueue(() => { if (!ct.IsCancellationRequested) OnAuthenticationSuccess(); });
                 }
                 else if (result == "password")
                 {
                     Dispatcher.Enqueue(() =>
                     {
+                        if (ct.IsCancellationRequested) return;
                         CurrentMode = AuthMode.TwoFactor;
                         StatusMessage = "Требуется пароль двухфакторной аутентификации (2FA).";
                     });
@@ -173,53 +174,59 @@ public sealed partial class AuthViewModel : ViewModelBase,
                 {
                     Dispatcher.Enqueue(() =>
                     {
+                        if (ct.IsCancellationRequested) return;
                         IsQrLoading = false;
+                        QrCodeImage = null;
                         ErrorMessage = MapTelegramError(ex.Message);
                         QrStatusText = "Ошибка генерации QR-кода. Попробуйте снова.";
                     });
                 }
             }
-        }, ct);
+            finally
+            {
+                Dispatcher.Enqueue(() =>
+                {
+                    if (ReferenceEquals(_qrCts, source)) _qrCts = null;
+                    source.Dispose();
+                });
+            }
+        });
     }
 
-    private async Task HandleQrUrlGeneratedAsync(string qrUrl)
+    private void HandleQrUrlGenerated(string qrUrl, CancellationToken ct)
     {
-        try
+        if (ct.IsCancellationRequested) return;
+        var pixels = QrCodeRenderer.GenerateBgraPixels(qrUrl, out var width, out var height);
+        Dispatcher.Enqueue(() =>
         {
-            var softwareBitmap = QrCodeRenderer.GenerateSoftwareBitmap(qrUrl, pixelsPerModule: 8, quietZoneModules: 4);
-
-            await Dispatcher.EnqueueAsync(async () =>
+            if (ct.IsCancellationRequested) return;
+            try
             {
-                try
-                {
-                    var source = new SoftwareBitmapSource();
-                    await source.SetBitmapAsync(softwareBitmap);
-                    QrCodeImage = source;
-                    IsQrLoading = false;
-                    QrStatusText = "QR-код готов к сканированию. Обновляется каждые 10 сек.";
-                }
-                catch
-                {
-                    // Fallback in headless/mock test mode
-                    IsQrLoading = false;
-                    QrStatusText = "QR-код готов к сканированию.";
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            Dispatcher.Enqueue(() =>
+                var source = new WriteableBitmap(width, height);
+                using var stream = source.PixelBuffer.AsStream();
+                stream.Write(pixels);
+                source.Invalidate();
+                QrCodeImage = source;
+                IsQrLoading = false;
+                QrStatusText = "QR-код готов к сканированию.";
+            }
+            catch
             {
-                ErrorMessage = $"Ошибка отрисовки QR-кода: {ex.Message}";
-            });
-        }
+                IsQrLoading = false;
+                QrStatusText = "Обновите QR-код или войдите по телефону.";
+                ErrorMessage = "Не удалось показать QR-код.";
+            }
+        });
     }
 
     [RelayCommand]
     public void SwitchToPhoneMode()
     {
+        if (IsBusy) return;
         CancelQrLogin();
         CurrentMode = AuthMode.PhoneInput;
+        PhoneCode = string.Empty;
+        TwoFactorPassword = string.Empty;
         ErrorMessage = null;
         StatusMessage = null;
     }
@@ -233,6 +240,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
     [RelayCommand]
     public async Task SendPhoneCodeAsync()
     {
+        if (IsBusy || CurrentMode != AuthMode.PhoneInput) return;
         if (string.IsNullOrWhiteSpace(PhoneNumber) || PhoneNumber.Trim().Length < 6)
         {
             ErrorMessage = "Пожалуйста, введите корректный номер телефона с кодом страны (например, +79001234567).";
@@ -262,11 +270,12 @@ public sealed partial class AuthViewModel : ViewModelBase,
             }
             else
             {
-                CurrentMode = AuthMode.CodeInput;
+                ErrorMessage = "Этот способ подтверждения недоступен. Попробуйте вход по QR-коду.";
             }
         }
         catch (Exception ex)
         {
+            if (ex.Message.Contains("PHONE_CODE_EXPIRED", StringComparison.OrdinalIgnoreCase)) CurrentMode = AuthMode.PhoneInput;
             ErrorMessage = MapTelegramError(ex.Message);
         }
         finally
@@ -278,6 +287,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
     [RelayCommand]
     public async Task SubmitPhoneCodeAsync()
     {
+        if (IsBusy || CurrentMode != AuthMode.CodeInput) return;
         if (string.IsNullOrWhiteSpace(PhoneCode))
         {
             ErrorMessage = "Пожалуйста, введите код подтверждения.";
@@ -307,6 +317,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
         }
         catch (Exception ex)
         {
+            if (ex.Message.Contains("PHONE_CODE_EXPIRED", StringComparison.OrdinalIgnoreCase)) CurrentMode = AuthMode.PhoneInput;
             ErrorMessage = MapTelegramError(ex.Message);
         }
         finally
@@ -318,6 +329,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
     [RelayCommand]
     public async Task Submit2FaAsync()
     {
+        if (IsBusy || CurrentMode != AuthMode.TwoFactor) return;
         if (string.IsNullOrEmpty(TwoFactorPassword))
         {
             ErrorMessage = "Пожалуйста, введите облачный пароль 2FA.";
@@ -354,6 +366,9 @@ public sealed partial class AuthViewModel : ViewModelBase,
     {
         if (IsAuthenticated) return;
         IsAuthenticated = true;
+        PhoneCode = string.Empty;
+        TwoFactorPassword = string.Empty;
+        QrCodeImage = null;
         CancelQrLogin();
         ErrorMessage = null;
         StatusMessage = "Авторизация успешно завершена!";
@@ -377,12 +392,11 @@ public sealed partial class AuthViewModel : ViewModelBase,
         }
     }
 
-    private void CancelQrLogin()
+    public void CancelQrLogin()
     {
         if (_qrCts != null)
         {
             _qrCts.Cancel();
-            _qrCts.Dispose();
             _qrCts = null;
         }
     }
@@ -403,7 +417,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
             error.Contains("session block", StringComparison.OrdinalIgnoreCase))
             return "Файл сессии был сброшен для нового входа. Повторите сканирование QR-кода.";
 
-        return $"Ошибка авторизации: {error}";
+        return "Не удалось войти. Проверьте подключение или настройки прокси и повторите попытку.";
     }
 
     public override void Dispose()

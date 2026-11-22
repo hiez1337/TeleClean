@@ -41,8 +41,8 @@ public sealed class WinUIDispatcherService : IDispatcherService
             return function();
         }
 
-        var tcs = new TaskCompletionSource();
-        _dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_dispatcherQueue.TryEnqueue(DispatcherQueuePriority.Normal, async () =>
         {
             try
             {
@@ -53,7 +53,7 @@ public sealed class WinUIDispatcherService : IDispatcherService
             {
                 tcs.SetException(ex);
             }
-        });
+        })) tcs.SetCanceled();
 
         return tcs.Task;
     }

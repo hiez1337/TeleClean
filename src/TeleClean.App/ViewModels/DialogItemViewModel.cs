@@ -19,6 +19,37 @@ public sealed partial class DialogItemViewModel : ObservableObject
     public int ParticipantCount => Model.ParticipantCount;
     public int UnreadCount => Model.UnreadCount;
     public DialogType DialogType => Model.DialogType;
+    public string ParticipantsText => ParticipantCount > 0 ? ParticipantCount.ToString("N0") : "—";
+    public string ActivityDateText => LastActivity?.ToLocalTime().ToString("dd.MM.yyyy") ?? "—";
+    public string DisplayStatus => StatusBadge ?? StatusText;
+
+    private bool _showComparison;
+    public bool ShowComparison
+    {
+        get => _showComparison;
+        set
+        {
+            if (!SetProperty(ref _showComparison, value)) return;
+            OnPropertyChanged(nameof(ShowCompactDetails));
+            OnPropertyChanged(nameof(ShowComparisonUsername));
+        }
+    }
+
+    public bool ShowCompactDetails => !ShowComparison;
+    public bool ShowComparisonUsername => ShowComparison && !string.IsNullOrWhiteSpace(Username);
+
+    public string Description
+    {
+        get
+        {
+            var parts = new System.Collections.Generic.List<string> { CategoryText };
+            if (!string.IsNullOrWhiteSpace(Username)) parts.Add($"@{Username}");
+            if (ParticipantCount > 0) parts.Add($"{ParticipantCount:N0} уч.");
+            if (UnreadCount > 0) parts.Add($"Новых: {UnreadCount}");
+            if (LastActivity.HasValue) parts.Add(FormattedLastActivity);
+            return string.Join("  ·  ", parts);
+        }
+    }
     public string Subtitle => Model.Subtitle;
     public DateTime? LastActivity => Model.LastActivity;
     public bool IsActive => Model.IsActive && IsJoined;
@@ -88,16 +119,24 @@ public sealed partial class DialogItemViewModel : ObservableObject
     private bool _isSelected;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanToggle))]
     [NotifyPropertyChangedFor(nameof(IsNotJoined))]
     [NotifyPropertyChangedFor(nameof(IsDimmed))]
     [NotifyPropertyChangedFor(nameof(IsActive))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(DisplayStatus))]
     private bool _isJoined;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanToggle))]
+    private bool _selectionEnabled;
+
+    public bool CanToggle => SelectionEnabled && IsJoined;
     public bool IsNotJoined => !IsJoined;
     public bool IsDimmed => !IsJoined;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayStatus))]
     private string? _statusBadge;
 
     [ObservableProperty]
@@ -112,10 +151,6 @@ public sealed partial class DialogItemViewModel : ObservableObject
     {
         Model = model ?? throw new ArgumentNullException(nameof(model));
         _isSelected = model.IsSelected;
-        if (model.DialogType == DialogType.Deleted && string.IsNullOrEmpty(model.StatusBadge) && !model.IsJoined)
-        {
-            model.IsJoined = true;
-        }
         _isJoined = model.IsJoined;
         _statusBadge = model.StatusBadge;
         _avatarLocalPath = model.AvatarLocalPath;

@@ -1,176 +1,70 @@
-<UserControl
-    x:Class="TeleClean.App.Views.AuthView"
+<UserControl x:Class="TeleClean.App.Views.AuthView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:converters="using:TeleClean.App.Converters"
-    mc:Ignorable="d">
-
-    <UserControl.Resources>
-        <converters:BooleanToVisibilityConverter x:Key="BoolToVis" />
-        <converters:InvertedBooleanToVisibilityConverter x:Key="InvertedBoolToVis" />
-    </UserControl.Resources>
-
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <Grid MinHeight="600" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
-            
-            <!-- Auth Card Container -->
-            <Border
-                Width="460"
-                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="32">
-
-                <StackPanel Spacing="20">
-                    
-                    <!-- App Logo & Title -->
-                    <StackPanel Spacing="6" HorizontalAlignment="Center">
-                        <FontIcon Glyph="&#xE7F4;" FontSize="36" HorizontalAlignment="Center" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                        <TextBlock Text="TeleClean" Style="{ThemeResource TitleTextBlockStyle}" HorizontalAlignment="Center" />
-                        <TextBlock Text="Очистка Telegram-каналов, чатов и ботов" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                    </StackPanel>
-
-                    <!-- Error InfoBar -->
-                    <InfoBar
-                        IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
-                        Severity="Error"
-                        Title="Ошибка входа"
-                        Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
-                        IsClosable="True" />
-
-                    <!-- MODE 0: QR Code Page -->
-                    <StackPanel Visibility="{x:Bind ViewModel.IsQrMode, Converter={StaticResource BoolToVis}, Mode=OneWay}" Spacing="16">
-                        <TextBlock Text="Вход по QR-коду" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
-
-                        <!-- QR Code Canvas with High Contrast Frame -->
-                        <Border
-                            Width="260"
-                            Height="260"
-                            Background="White"
-                            CornerRadius="12"
-                            BorderBrush="#E5E5E5"
-                            BorderThickness="1"
-                            HorizontalAlignment="Center"
-                            Padding="12">
-                            <Grid>
-                                <Image
-                                    Source="{x:Bind ViewModel.QrCodeImage, Mode=OneWay}"
-                                    Width="236"
-                                    Height="236"
-                                    Stretch="Uniform" />
-                                
-                                <ProgressRing
-                                    IsActive="{x:Bind ViewModel.IsQrLoading, Mode=OneWay}"
-                                    Visibility="{x:Bind ViewModel.IsQrLoading, Converter={StaticResource BoolToVis}, Mode=OneWay}"
-                                    Width="48" Height="48"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Grid>
-                        </Border>
-
-                        <!-- Russian Instructions matching Telegram Desktop UX -->
-                        <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="8" Padding="14,10">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Как войти:" FontWeight="SemiBold" FontSize="12" />
-                                <TextBlock Text="1. Откройте Telegram на телефоне" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock Text="2. Настройки → Устройства → Подключить устройство" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                <TextBlock Text="3. Наведите камеру на этот экран" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Refresh status -->
-                        <TextBlock
-                            Text="{x:Bind ViewModel.QrStatusText, Mode=OneWay}"
-                            Style="{ThemeResource CaptionTextBlockStyle}"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            HorizontalAlignment="Center" />
-
-                        <HyperlinkButton
-                            Content="Войти по номеру телефона"
-                            Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"
-                            HorizontalAlignment="Center" />
-                    </StackPanel>
-
-                    <!-- MODE 1: Phone Login Page -->
-                    <StackPanel Visibility="{x:Bind ViewModel.IsPhoneMode, Converter={StaticResource BoolToVis}, Mode=OneWay}" Spacing="14">
-                        <TextBlock Text="Вход по номеру телефона" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
-
-                        <TextBox
-                            Header="Номер телефона"
-                            PlaceholderText="+7 900 123-45-67"
-                            Text="{x:Bind ViewModel.PhoneNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                            IsEnabled="{x:Bind ViewModel.IsPhoneInputEnabled, Mode=OneWay}" />
-
-                        <Button
-                            Content="Отправить код"
-                            Command="{x:Bind ViewModel.SendPhoneCodeCommand}"
-                            HorizontalAlignment="Stretch"
-                            Style="{ThemeResource AccentButtonStyle}"
-                            Visibility="{x:Bind ViewModel.IsSendCodeButtonVisible, Converter={StaticResource BoolToVis}, Mode=OneWay}" />
-
-                        <!-- Code Entry Form (appears after code sent) -->
-                        <StackPanel Visibility="{x:Bind ViewModel.IsCodeInputVisible, Converter={StaticResource BoolToVis}, Mode=OneWay}" Spacing="12">
-                            <TextBox
-                                Header="Код подтверждения из Telegram"
-                                PlaceholderText="12345"
-                                MaxLength="10"
-                                Text="{x:Bind ViewModel.PhoneCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <Button
-                                Content="Подтвердить код"
-                                Command="{x:Bind ViewModel.SubmitPhoneCodeCommand}"
-                                HorizontalAlignment="Stretch"
-                                Style="{ThemeResource AccentButtonStyle}" />
-                        </StackPanel>
-
-                        <HyperlinkButton
-                            Content="← Назад к QR-коду"
-                            Command="{x:Bind ViewModel.SwitchToQrModeCommand}"
-                            HorizontalAlignment="Center" />
-                    </StackPanel>
-
-                    <!-- MODE 2: 2FA Password Page -->
-                    <StackPanel Visibility="{x:Bind ViewModel.Is2FaMode, Converter={StaticResource BoolToVis}, Mode=OneWay}" Spacing="14">
-                        <TextBlock Text="Двухфакторная защита (2FA)" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
-                        <TextBlock Text="На вашем аккаунте включен облачный пароль. Введите его для завершения входа:"
-                                   FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-
-                        <PasswordBox
-                            Header="Облачный пароль"
-                            PlaceholderText="Пароль двухфакторной аутентификации"
-                            Password="{x:Bind ViewModel.TwoFactorPassword, Mode=TwoWay}" />
-
-                        <Button
-                            Content="Войти в аккаунт"
-                            Command="{x:Bind ViewModel.Submit2FaCommand}"
-                            HorizontalAlignment="Stretch"
-                            Style="{ThemeResource AccentButtonStyle}" />
-
-                        <HyperlinkButton
-                            Content="← Отмена"
-                            Command="{x:Bind ViewModel.SwitchToQrModeCommand}"
-                            HorizontalAlignment="Center" />
-                    </StackPanel>
-
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="{ThemeResource WorkspaceBrush}">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="744" Margin="24,24" Spacing="16">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Border Width="36" Height="36" Background="{ThemeResource BrandBrush}" CornerRadius="10">
+                        <FontIcon Glyph="&#xE724;" FontSize="17" Foreground="{ThemeResource OnBrandBrush}"/>
+                    </Border>
+                    <TextBlock Text="TeleClean" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16"/>
                 </StackPanel>
-            </Border>
-
-            <!-- Proxy Settings Button — overlaid top-right of the card -->
-            <Button
-                x:Name="ProxySettingsButton"
-                Click="OnProxySettingsClick"
-                Width="36" Height="36"
-                Padding="0"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="0,8,8,0"
-                ToolTipService.ToolTip="Настройки прокси / подключения"
-                Style="{ThemeResource DefaultButtonStyle}">
-                <FontIcon Glyph="&#xE713;" FontSize="16" />
-            </Button>
-
-        </Grid>
-    </ScrollViewer>
+                <StackPanel Spacing="5">
+                    <TextBlock Text="Подключите Telegram" Style="{StaticResource WorkspaceTitle}" TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1"/>
+                    <TextBlock Text="После входа вы сможете просмотреть диалоги и выбрать, какие из них убрать." Style="{StaticResource SupportingText}"/>
+                </StackPanel>
+                <Border Style="{StaticResource WorkspacePanel}" Padding="20">
+                    <StackPanel Spacing="12">
+                        <InfoBar Title="Вход не завершён" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                                 Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}" Severity="Error" IsClosable="False"/>
+                        <ProgressBar Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" IsIndeterminate="True"/>
+                        <Grid x:Name="QrLayout" Visibility="{x:Bind ViewModel.IsQrMode, Mode=OneWay}"
+                              ColumnSpacing="24" RowSpacing="16" SizeChanged="OnQrLayoutSizeChanged">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                            <Border Background="White" Width="260" Height="260" CornerRadius="10" HorizontalAlignment="Left">
+                                <Grid>
+                                    <Image Source="{x:Bind ViewModel.QrCodeImage, Mode=OneWay}" AutomationProperties.Name="QR-код для входа в Telegram"/>
+                                    <ProgressRing Width="28" Height="28" IsActive="{x:Bind ViewModel.IsQrLoading, Mode=OneWay}" RequestedTheme="Light"/>
+                                </Grid>
+                            </Border>
+                            <StackPanel x:Name="QrInstructions" Grid.Column="1" VerticalAlignment="Center" Spacing="12">
+                                <TextBlock Text="Вход по QR-коду" Style="{ThemeResource SubtitleTextBlockStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                                <TextBlock Text="На телефоне откройте Telegram → Настройки → Устройства → Подключить устройство. Наведите камеру на код." Style="{StaticResource SupportingText}"/>
+                                <TextBlock Text="{x:Bind ViewModel.QrStatusText, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
+                                <Button Content="Обновить QR-код" Command="{x:Bind ViewModel.StartQrLoginCommand}"/>
+                                <Button Content="Войти по номеру телефона" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Visibility="{x:Bind ViewModel.IsPhoneMode, Mode=OneWay}" Spacing="12">
+                            <TextBlock Text="Вход по телефону" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                            <TextBox x:Name="PhoneInput" Header="Номер с кодом страны" InputScope="TelephoneNumber"
+                                Text="{x:Bind ViewModel.PhoneNumber, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                IsEnabled="{x:Bind ViewModel.IsPhoneInputEnabled, Mode=OneWay}"/>
+                            <Button Content="Получить код" Command="{x:Bind ViewModel.SendPhoneCodeCommand}" Style="{ThemeResource AccentButtonStyle}"
+                                Visibility="{x:Bind ViewModel.IsSendCodeButtonVisible, Mode=OneWay}"/>
+                            <StackPanel Visibility="{x:Bind ViewModel.IsCodeInputVisible, Mode=OneWay}" Spacing="10">
+                                <TextBox x:Name="CodeInput" Header="Код подтверждения" InputScope="Number"
+                                    Text="{x:Bind ViewModel.PhoneCode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <Button Content="Подтвердить код" Command="{x:Bind ViewModel.SubmitPhoneCodeCommand}" Style="{ThemeResource AccentButtonStyle}"/>
+                                <Button Content="Изменить номер или запросить новый код" Command="{x:Bind ViewModel.SwitchToPhoneModeCommand}"/>
+                            </StackPanel>
+                            <Button Content="Вернуться к QR-коду" Command="{x:Bind ViewModel.SwitchToQrModeCommand}"/>
+                        </StackPanel>
+                        <StackPanel Visibility="{x:Bind ViewModel.Is2FaMode, Mode=OneWay}" Spacing="12">
+                            <TextBlock Text="Облачный пароль Telegram" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap"/>
+                            <PasswordBox x:Name="PasswordInput" Header="Пароль двухэтапной аутентификации"
+                                         Password="{x:Bind ViewModel.TwoFactorPassword, Mode=TwoWay}"/>
+                            <Button Content="Войти" Command="{x:Bind ViewModel.Submit2FaCommand}" Style="{ThemeResource AccentButtonStyle}"/>
+                            <Button Content="Вернуться к QR-коду" Command="{x:Bind ViewModel.SwitchToQrModeCommand}"/>
+                        </StackPanel>
+                        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Style="{StaticResource SupportingText}"
+                                   Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}" AutomationProperties.LiveSetting="Polite"/>
+                    </StackPanel>
+                </Border>
+                <Button Content="Настройки подключения" Click="OnProxySettingsClick" IsEnabled="{x:Bind ViewModel.IsReady, Mode=OneWay}"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

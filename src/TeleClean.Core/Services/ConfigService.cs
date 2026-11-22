@@ -13,6 +13,7 @@ public sealed class ConfigService : IConfigService
     public const string BuildApiHash = "dabf2aadd76c3a56983809d54c0760c6";
 
     private readonly object _lock = new();
+    private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly string? _customDataDir;
     private AppConfig _currentConfig = new();
     private bool _isLoaded;
@@ -145,82 +146,34 @@ public sealed class ConfigService : IConfigService
 
     public async Task<AppConfig> LoadConfigAsync(CancellationToken ct = default)
     {
-        var path = GetConfigFilePath();
-        if (!File.Exists(path))
-        {
-            lock (_lock)
-            {
-                _currentConfig = new AppConfig
-                {
-                    SessionPath = Path.Combine(GetDataDirectory(), "teleclean_v2.session"),
-                    AvatarCacheDir = Path.Combine(GetDataDirectory(), "avatars")
-                };
-                _isLoaded = true;
-                return _currentConfig;
-            }
-        }
-
-        try
-        {
-            var json = await File.ReadAllTextAsync(path, ct);
-            var loaded = JsonSerializer.Deserialize<AppConfig>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            lock (_lock)
-            {
-                _currentConfig = loaded ?? new AppConfig();
-                if (string.IsNullOrWhiteSpace(_currentConfig.SessionPath) ||
-                    Path.GetFileName(_currentConfig.SessionPath).Equals("teleclean.session", StringComparison.OrdinalIgnoreCase))
-                {
-                    _currentConfig.SessionPath = Path.Combine(GetDataDirectory(), "teleclean_v2.session");
-                }
-                if (string.IsNullOrWhiteSpace(_currentConfig.AvatarCacheDir))
-                {
-                    _currentConfig.AvatarCacheDir = Path.Combine(GetDataDirectory(), "avatars");
-                }
-                _isLoaded = true;
-                return _currentConfig;
-            }
-        }
-        catch
-        {
-            lock (_lock)
-            {
-                _currentConfig = new AppConfig
-                {
-                    SessionPath = Path.Combine(GetDataDirectory(), "teleclean_v2.session"),
-                    AvatarCacheDir = Path.Combine(GetDataDirectory(), "avatars")
-                };
-                _isLoaded = true;
-                return _currentConfig;
-            }
-        }
+        await _fileLock.WaitAsync(ct);
+        try { return CurrentConfig; }
+        finally { _fileLock.Release(); }
     }
 
     public async Task SaveConfigAsync(AppConfig config, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(config);
-
+        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
         var path = GetConfigFilePath();
-        var dir = Path.GetDirectoryName(path);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+
+        await _fileLock.WaitAsync(ct);
+        try
         {
-            Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(temporary, json, ct);
+            File.Move(temporary, path, overwrite: true);
+            lock (_lock)
+            {
+                _currentConfig = config;
+                _isLoaded = true;
+            }
         }
-
-        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+        finally
         {
-            WriteIndented = true
-        });
-
-        await File.WriteAllTextAsync(path, json, ct);
-
-        lock (_lock)
-        {
-            _currentConfig = config;
-            _isLoaded = true;
+            _fileLock.Release();
+            File.Delete(temporary);
         }
     }
 

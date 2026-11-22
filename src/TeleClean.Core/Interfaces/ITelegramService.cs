@@ -67,8 +67,11 @@ public interface ITelegramService
     /// </summary>
     Task<LeaveResult> LeaveDialogAsync(DialogItem dialog, CancellationToken ct = default);
 
+    /// <summary>Server-requested wait from the last rate-limited action, when available.</summary>
+    TimeSpan? RateLimitRetryAfter => null;
+
     /// <summary>
     /// Downloads dialog avatar / profile photo and returns local cached file path.
     /// </summary>
-    Task<string?> DownloadAvatarAsync(long dialogId, CancellationToken ct = default);
+    Task<string?> DownloadAvatarAsync(DialogItem dialog, CancellationToken ct = default);
 }

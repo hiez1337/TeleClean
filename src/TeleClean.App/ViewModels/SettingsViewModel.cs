@@ -87,9 +87,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
             OnPropertyChanged(nameof(SessionStatusText));
             OnPropertyChanged(nameof(SettingsFooterText));
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorMessage = $"Не удалось загрузить настройки: {ex.Message}";
+            ErrorMessage = "Не удалось загрузить настройки. Повторите попытку.";
         }
         finally
         {
@@ -110,7 +110,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         };
 
         _config.Theme = themeName;
-        _ = _configService.SaveConfigAsync(_config);
+        _ = SavePreferencesAsync();
 
         WeakReferenceMessenger.Default.Send(new ThemeChangedMessage(themeName));
     }
@@ -127,7 +127,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         };
 
         _config.Backdrop = backdropName;
-        _ = _configService.SaveConfigAsync(_config);
+        _ = SavePreferencesAsync();
 
         WeakReferenceMessenger.Default.Send(new BackdropChangedMessage(backdropName));
     }
@@ -136,14 +136,23 @@ public sealed partial class SettingsViewModel : ViewModelBase
     {
         if (_isInitializing) return;
         _config.DefaultDelaySeconds = Math.Round(value, 1);
-        _ = _configService.SaveConfigAsync(_config);
+        _ = SavePreferencesAsync();
+    }
+
+    private async Task SavePreferencesAsync()
+    {
+        try { await _configService.SaveConfigAsync(_config); }
+        catch
+        {
+            ErrorMessage = "Не удалось сохранить настройки. Проверьте доступ к папке данных.";
+        }
     }
 
     [RelayCommand]
     public async Task SaveApiKeysAsync()
     {
         int id = (int)ApiId;
-        if (id <= 0 || string.IsNullOrWhiteSpace(ApiHash))
+        if (id <= 0 || id != ApiId || ApiHash.Trim().Length != 32 || !System.Linq.Enumerable.All(ApiHash.Trim(), Uri.IsHexDigit))
         {
             ErrorMessage = "Введите корректные API ID и API Hash.";
             return;
@@ -163,9 +172,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
             StatusMessage = "API ключи успешно сохранены.";
             ErrorMessage = null;
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorMessage = $"Ошибка сохранения API ключей: {ex.Message}";
+            ErrorMessage = "Ошибка сохранения API ключей. Повторите попытку.";
         }
     }
 
@@ -177,13 +186,13 @@ public sealed partial class SettingsViewModel : ViewModelBase
             _config.ProxyUrl = string.IsNullOrWhiteSpace(ProxyUrl) ? null : ProxyUrl.Trim();
             await _configService.SaveConfigAsync(_config);
             StatusMessage = string.IsNullOrWhiteSpace(_config.ProxyUrl)
-                ? "Прокси отключён. Перезапустите авторизацию."
-                : "Прокси сохранён. Перезапустите авторизацию для применения.";
+                ? "Прокси отключён. Перезапустите приложение."
+                : "Прокси сохранён. Перезапустите приложение для применения.";
             ErrorMessage = null;
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorMessage = $"Ошибка сохранения прокси: {ex.Message}";
+            ErrorMessage = "Ошибка сохранения прокси. Повторите попытку.";
         }
     }
 
@@ -199,25 +208,14 @@ public sealed partial class SettingsViewModel : ViewModelBase
     {
         try
         {
-            await _cacheService.ClearCacheAsync();
-
-            string dataDir = _configService.GetDataDirectory();
-            string avatarDir = Path.Combine(dataDir, "avatars");
-            if (Directory.Exists(avatarDir))
-            {
-                var files = Directory.GetFiles(avatarDir);
-                foreach (var file in files)
-                {
-                    try { File.Delete(file); } catch { /* best effort */ }
-                }
-            }
+            await _cacheService.ClearAvatarCacheAsync();
 
             StatusMessage = "Кэш аватаров успешно очищен.";
             ErrorMessage = null;
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorMessage = $"Ошибка очистки кэша: {ex.Message}";
+            ErrorMessage = "Ошибка очистки кэша. Повторите попытку.";
         }
     }
 
@@ -228,16 +226,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
         try
         {
             await _telegramService.ResetSessionAsync();
-            await _cacheService.ClearCacheAsync();
 
             StatusMessage = "Сессия сброшена.";
             ErrorMessage = null;
 
             WeakReferenceMessenger.Default.Send(new AuthenticationStateChangedMessage(false));
         }
-        catch (Exception ex)
+        catch
         {
-            ErrorMessage = $"Ошибка сброса сессии: {ex.Message}";
+            ErrorMessage = "Ошибка сброса сессии. Повторите попытку.";
         }
         finally
         {
