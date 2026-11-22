@@ -34,7 +34,11 @@ public sealed partial class AuthView : UserControl
 
     private void OnQrLayoutSizeChanged(object sender, SizeChangedEventArgs e)
     {
+        const double qrSize = 260;
         bool stacked = e.NewSize.Width < 544;
+        QrTile.Width = QrTile.Height = Math.Min(qrSize, e.NewSize.Width);
+        QrTile.HorizontalAlignment = stacked ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+        Grid.SetColumnSpan(QrTile, stacked ? 2 : 1);
         Grid.SetColumn(QrInstructions, stacked ? 0 : 1);
         Grid.SetColumnSpan(QrInstructions, stacked ? 2 : 1);
         Grid.SetRow(QrInstructions, stacked ? 1 : 0);
@@ -56,18 +60,16 @@ public sealed partial class AuthView : UserControl
 
         var proxyBox = new PasswordBox
         {
-            Header = "MTProxy URL",
-            PlaceholderText = "tg://proxy?server=...&port=...&secret=...  или  https://t.me/proxy?...",
+            Header = "Ссылка MTProxy",
+            PlaceholderText = "tg://proxy или https://t.me/proxy",
             Password = config.ProxyUrl ?? string.Empty,
             PasswordRevealMode = PasswordRevealMode.Peek,
-            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
             Margin = new Thickness(0, 8, 0, 0)
         };
 
         var infoText = new TextBlock
         {
-            Text = "Если Telegram заблокирован провайдером — вставьте ссылку MTProxy.\nОставьте поле пустым для прямого подключения.",
-            FontSize = 12,
+            Text = "Вставьте ссылку MTProxy, если Telegram недоступен. Для прямого подключения оставьте поле пустым.",
             TextWrapping = TextWrapping.Wrap
         };
 

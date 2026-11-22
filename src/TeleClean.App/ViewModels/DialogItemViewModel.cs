@@ -21,6 +21,17 @@ public sealed partial class DialogItemViewModel : ObservableObject
     public string ParticipantsText => ParticipantCount > 0 ? ParticipantCount.ToString("N0") : "—";
     public string ActivityDateText => LastActivity?.ToLocalTime().ToString("dd.MM.yyyy") ?? "—";
     public string DisplayStatus => StatusBadge ?? StatusText;
+    public string CompactMetrics
+    {
+        get
+        {
+            var parts = new System.Collections.Generic.List<string>(4) { CategoryText };
+            if (ParticipantCount > 0) parts.Add($"{ParticipantsText}\u00a0уч.");
+            if (UnreadCount > 0) parts.Add($"Непроч.:\u00a0{UnreadCount:N0}");
+            if (LastActivity.HasValue) parts.Add(ActivityDateText);
+            return string.Join(" · ", parts);
+        }
+    }
 
     private bool _showComparison;
     public bool ShowComparison
@@ -37,18 +48,6 @@ public sealed partial class DialogItemViewModel : ObservableObject
     public bool ShowCompactDetails => !ShowComparison;
     public bool ShowComparisonUsername => ShowComparison && !string.IsNullOrWhiteSpace(Username);
 
-    public string Description
-    {
-        get
-        {
-            var parts = new System.Collections.Generic.List<string> { CategoryText };
-            if (!string.IsNullOrWhiteSpace(Username)) parts.Add($"@{Username}");
-            if (ParticipantCount > 0) parts.Add($"{ParticipantCount:N0} уч.");
-            if (UnreadCount > 0) parts.Add($"Новых: {UnreadCount}");
-            if (LastActivity.HasValue) parts.Add(FormattedLastActivity);
-            return string.Join("  ·  ", parts);
-        }
-    }
     public string Subtitle => Model.Subtitle;
     public DateTime? LastActivity => Model.LastActivity;
     public bool IsActive => Model.IsActive && IsJoined;
