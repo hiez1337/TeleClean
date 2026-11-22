@@ -7,9 +7,11 @@
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Text="{x:Bind ViewModel.CurrentCategoryTitleWithCount, Mode=OneWay}"
-            FontSize="25" FontWeight="SemiBold" AutomationProperties.HeadingLevel="Level1"
-            ToolTipService.ToolTip="{x:Bind ViewModel.CategoryHint, Mode=OneWay}"/>
+        <StackPanel Spacing="2">
+            <TextBlock Text="{x:Bind ViewModel.CurrentCategoryTitleWithCount, Mode=OneWay}"
+                Style="{StaticResource WorkspaceTitle}" AutomationProperties.HeadingLevel="Level1"/>
+            <TextBlock Text="{x:Bind ViewModel.CategoryHint, Mode=OneWay}" Style="{StaticResource SupportingText}"/>
+        </StackPanel>
 
         <Grid Grid.Row="1" ColumnSpacing="10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -38,7 +40,7 @@
         </Grid>
 
         <StackPanel Grid.Row="2" Spacing="6">
-            <InfoBar Title="Обновите список" Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+            <InfoBar Title="Список недоступен" Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                 Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" IsClosable="False"/>
             <TextBlock Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
             <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}"/>
@@ -55,7 +57,7 @@
                     <CheckBox x:Name="SelectVisible" MinWidth="0" Padding="0" IsThreeState="False"
                         AutomationProperties.Name="Выбрать видимые" ToolTipService.ToolTip="Выбрать видимые"
                         IsChecked="{x:Bind ViewModel.IsAllSelectedInView, Mode=OneWay}"
-                        IsEnabled="{x:Bind ViewModel.CanSelect, Mode=OneWay}" Click="OnSelectVisible"/>
+                        IsEnabled="{x:Bind ViewModel.CanSelectVisible, Mode=OneWay}" Click="OnSelectVisible"/>
                     <TextBlock x:Name="NameHeading" Grid.Column="2" VerticalAlignment="Center" FontWeight="SemiBold"
                         Text="Название"/>
                     <Grid x:Name="ComparisonHeading" Grid.Column="3" ColumnSpacing="8">

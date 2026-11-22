@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -26,10 +28,23 @@ public partial class App : Application
         // Dispatcher service initialized with main UI thread queue
         services.AddSingleton<IDispatcherService>(new WinUIDispatcherService(DispatcherQueue.GetForCurrentThread()));
 
-        // Core singletons
-        services.AddSingleton<IConfigService, ConfigService>();
+        var commandLine = Environment.GetCommandLineArgs();
+        bool demoLogin = commandLine.Contains("--demo-login", StringComparer.Ordinal);
+        bool demo = demoLogin || commandLine.Contains("--demo", StringComparer.Ordinal);
+
+        if (demo)
+        {
+            var profile = Path.Combine(Path.GetTempPath(), "TeleClean-demo-" + Guid.NewGuid().ToString("N"));
+            services.AddSingleton<IConfigService>(new ConfigService(profile));
+            services.AddSingleton<ITelegramService>(new DemoTelegramService(!demoLogin));
+        }
+        else
+        {
+            services.AddSingleton<IConfigService, ConfigService>();
+            services.AddSingleton<ITelegramService, TelegramService>();
+        }
+
         services.AddSingleton<ICacheService, CacheService>();
-        services.AddSingleton<ITelegramService, TelegramService>();
         services.AddSingleton<IBulkExecutionEngine, BulkExecutionEngine>();
 
         // ViewModels
@@ -46,6 +61,7 @@ public partial class App : Application
         Services.GetRequiredService<BulkExecutionViewModel>();
 
         MainWindow = new MainWindow();
+        if (demo) MainWindow.Title = "TeleClean · Пример без Telegram";
         MainWindow.Activate();
     }
 }

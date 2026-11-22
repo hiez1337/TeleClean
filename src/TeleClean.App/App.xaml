@@ -9,14 +9,14 @@
             </ResourceDictionary.MergedDictionaries>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Default">
-                    <SolidColorBrush x:Key="WorkspaceBrush" Color="#181F29"/>
-                    <SolidColorBrush x:Key="PanelBrush" Color="#202A37"/>
-                    <SolidColorBrush x:Key="SelectionBrush" Color="#304961"/>
+                    <SolidColorBrush x:Key="WorkspaceBrush" Color="#151E27"/>
+                    <SolidColorBrush x:Key="PanelBrush" Color="#1C2935"/>
+                    <SolidColorBrush x:Key="SelectionBrush" Color="#304B65"/>
                     <SolidColorBrush x:Key="BrandBrush" Color="#9BCFF7"/>
                     <SolidColorBrush x:Key="OnBrandBrush" Color="#142E43"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="WorkspaceBrush" Color="#EFF4FA"/>
+                    <SolidColorBrush x:Key="WorkspaceBrush" Color="#F1F5F9"/>
                     <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF"/>
                     <SolidColorBrush x:Key="SelectionBrush" Color="#DBEBFC"/>
                     <SolidColorBrush x:Key="BrandBrush" Color="#134B76"/>
@@ -32,7 +32,7 @@
             </ResourceDictionary.ThemeDictionaries>
             <converters:InvertedBooleanToVisibilityConverter x:Key="InvertedBoolToVis"/>
             <Style x:Key="WorkspaceTitle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="32"/>
+                <Setter Property="FontSize" Value="26"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
             </Style>
             <Style x:Key="SupportingText" TargetType="TextBlock">

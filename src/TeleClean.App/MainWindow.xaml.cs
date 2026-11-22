@@ -20,6 +20,10 @@ public sealed partial class MainWindow : Window,
     IRecipient<AuthenticationStateChangedMessage>, IRecipient<StartBulkExecutionMessage>,
     IRecipient<ThemeChangedMessage>, IRecipient<BackdropChangedMessage>
 {
+    private object? _lastDialogCategory;
+
+    public void ReturnToDialogs() => Navigation.SelectedItem = _lastDialogCategory ?? Channels;
+
     public DialogListViewModel DialogListVm { get; }
     public BulkExecutionViewModel BulkExecutionVm { get; }
 
@@ -105,6 +109,7 @@ public sealed partial class MainWindow : Window,
         Type page;
         if (index < 4)
         {
+            _lastDialogCategory = item;
             DialogListVm.SelectedCategoryIndex = index;
             page = typeof(DialogsView);
         }

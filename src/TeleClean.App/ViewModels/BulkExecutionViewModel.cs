@@ -58,6 +58,8 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     [NotifyPropertyChangedFor(nameof(IsWaitingOnRateLimit))]
     [NotifyPropertyChangedFor(nameof(CanPause))]
     [NotifyPropertyChangedFor(nameof(CanResume))]
+    [NotifyPropertyChangedFor(nameof(CanTogglePause))]
+    [NotifyPropertyChangedFor(nameof(HasStarted))]
     [NotifyPropertyChangedFor(nameof(CanStop))]
     [NotifyPropertyChangedFor(nameof(PauseButtonText))]
     private BulkOperationState _currentState = BulkOperationState.Idle;
@@ -83,6 +85,7 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     [ObservableProperty]
     private string _successErrorCounterText = "Успешно: 0 | Ошибок: 0";
 
+    public bool HasStarted => CurrentState != BulkOperationState.Idle;
     public bool IsOperationActive => _executionCts != null;
     public bool IsWaitingOnRateLimit => CurrentState == BulkOperationState.RateLimited;
     public bool CanPause => CurrentState == BulkOperationState.Running;
@@ -232,12 +235,12 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
                     break;
 
                 case BulkOperationState.Completed:
-                    CurrentStatusDescription = $"Операция завершена. Успешно: {SuccessCount}, ошибок: {ErrorCount}";
+                    CurrentStatusDescription = $"Обработано {CurrentIndex} из {TotalCount}.";
                     StateBadgeText = "Завершено";
                     break;
 
                 case BulkOperationState.Interrupted:
-                    CurrentStatusDescription = $"Операция прервана. Обработано {CurrentIndex} из {TotalCount}";
+                    CurrentStatusDescription = $"Обработано {CurrentIndex} из {TotalCount}. Остальные диалоги оставлены в списке.";
                     StateBadgeText = "Прервано";
                     break;
 
