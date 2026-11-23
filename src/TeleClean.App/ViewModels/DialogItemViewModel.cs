@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
+using TeleClean.App.Models;
 using TeleClean.Core.Models;
 
 namespace TeleClean.App.ViewModels;
@@ -21,14 +23,54 @@ public sealed partial class DialogItemViewModel : ObservableObject
     public string ParticipantsText => ParticipantCount > 0 ? ParticipantCount.ToString("N0") : "—";
     public string ActivityDateText => LastActivity?.ToLocalTime().ToString("dd.MM.yyyy") ?? "—";
     public string DisplayStatus => StatusBadge ?? StatusText;
+
+    public bool HasUnread => UnreadCount > 0;
+    public string UnreadBadgeText => UnreadCount > 9999 ? "9 999+" : UnreadCount.ToString("N0");
+
+    public string CleanStatusText => StripLeadingStatusEmoji(DisplayStatus);
+
+    public StatusTone StatusTone
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(StatusBadge))
+            {
+                if (StatusBadge.Contains("Ограничение", StringComparison.OrdinalIgnoreCase))
+                    return StatusTone.Warning;
+                if (StatusBadge.Contains("Нет доступа", StringComparison.OrdinalIgnoreCase)
+                    || StatusBadge.Contains("Ошибка", StringComparison.OrdinalIgnoreCase)
+                    || StatusBadge.Contains("Не найден", StringComparison.OrdinalIgnoreCase))
+                    return StatusTone.Danger;
+                return StatusTone.Neutral;
+            }
+
+            return IsActive ? StatusTone.Success : StatusTone.Neutral;
+        }
+    }
+
+    public bool ShowStatusDot => string.IsNullOrWhiteSpace(StatusBadge) && IsActive;
+
     public string CompactMetrics
     {
         get
         {
-            var parts = new System.Collections.Generic.List<string>(4) { CategoryText };
+            var parts = new List<string>(4) { CategoryText };
             if (ParticipantCount > 0) parts.Add($"{ParticipantsText}\u00a0уч.");
             if (UnreadCount > 0) parts.Add($"Непроч.:\u00a0{UnreadCount:N0}");
             if (LastActivity.HasValue) parts.Add(ActivityDateText);
+            return string.Join(" · ", parts);
+        }
+    }
+
+    public string CompactSubtitle
+    {
+        get
+        {
+            var parts = new List<string>(4);
+            if (!string.IsNullOrWhiteSpace(Username)) parts.Add($"@{Username}");
+            if (ParticipantCount > 0) parts.Add($"{ParticipantsText}\u00a0уч.");
+            if (LastActivity.HasValue) parts.Add(ActivityDateText);
+            if (parts.Count == 0) parts.Add(CategoryText);
             return string.Join(" · ", parts);
         }
     }
@@ -113,6 +155,20 @@ public sealed partial class DialogItemViewModel : ObservableObject
         return years == 1 ? "1 год назад" : $"{years} г. назад";
     }
 
+    private static string StripLeadingStatusEmoji(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
+        string trimmed = text.Trim();
+        foreach (string prefix in new[] { "✅ ", "⏳ ", "🗑 ", "✓ " })
+        {
+            if (trimmed.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return trimmed[prefix.Length..].Trim();
+            }
+        }
+        return trimmed;
+    }
+
     [ObservableProperty]
     private bool _isSelected;
 
@@ -123,6 +179,9 @@ public sealed partial class DialogItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsActive))]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(DisplayStatus))]
+    [NotifyPropertyChangedFor(nameof(CleanStatusText))]
+    [NotifyPropertyChangedFor(nameof(StatusTone))]
+    [NotifyPropertyChangedFor(nameof(ShowStatusDot))]
     private bool _isJoined;
 
     [ObservableProperty]
@@ -135,6 +194,9 @@ public sealed partial class DialogItemViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayStatus))]
+    [NotifyPropertyChangedFor(nameof(CleanStatusText))]
+    [NotifyPropertyChangedFor(nameof(StatusTone))]
+    [NotifyPropertyChangedFor(nameof(ShowStatusDot))]
     private string? _statusBadge;
 
     [ObservableProperty]
@@ -158,7 +220,7 @@ public sealed partial class DialogItemViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Updates item to post-action state («✅ Вышел» or «🗑 Удален» badge, strikethrough, unchecked).
+    /// Updates item to post-action state («✅ Вышел» or «Удалён» badge, dimmed, unchecked).
     /// </summary>
     public void MarkLeft(string? badge = null)
     {

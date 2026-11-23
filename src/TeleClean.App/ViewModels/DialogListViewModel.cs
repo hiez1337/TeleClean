@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,6 +52,8 @@ public sealed partial class DialogListViewModel : ViewModelBase
     public bool CanSelect => _hasFreshDialogs && CanRefresh;
     public bool HasFilters => !string.IsNullOrWhiteSpace(SearchQuery) || SelectedFilterIndex != 0;
     public bool ShowEmpty => !IsBusy && VisibleDialogs.Count == 0 && ErrorMessage == null;
+    public bool HasNotificationArea => HasError || IsBusy;
+
     public string CategoryHint => CurrentCategory switch
     {
         DialogCategoryTab.Channels => "Подписки, из которых можно выйти.",
@@ -60,9 +61,9 @@ public sealed partial class DialogListViewModel : ViewModelBase
         DialogCategoryTab.Bots => "Диалоги с ботами. Удаление истории не блокирует бота.",
         _ => "Диалоги с удалёнными аккаунтами."
     };
+
     public string EmptyTitle => HasFilters ? "Ничего не найдено" : "Здесь пока нет диалогов";
     public string EmptyHint => HasFilters ? "Измените запрос или сбросьте фильтры." : "Диалоги этой категории появятся после обновления списка.";
-
 
     [ObservableProperty]
     private IReadOnlyList<DialogItemViewModel> _visibleDialogs = Array.Empty<DialogItemViewModel>();
@@ -83,6 +84,8 @@ public sealed partial class DialogListViewModel : ViewModelBase
     };
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CurrentCategoryTitle))]
+    [NotifyPropertyChangedFor(nameof(CurrentCategoryCount))]
     [NotifyPropertyChangedFor(nameof(CurrentCategoryTitleWithCount))]
     [NotifyPropertyChangedFor(nameof(CategoryHint))]
     [NotifyPropertyChangedFor(nameof(BottomStatusBarText))]
@@ -99,12 +102,21 @@ public sealed partial class DialogListViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(ParticipantsSortHeader))]
     [NotifyPropertyChangedFor(nameof(UnreadSortHeader))]
     [NotifyPropertyChangedFor(nameof(ActivitySortHeader))]
+    [NotifyPropertyChangedFor(nameof(IsTitleSorted))]
+    [NotifyPropertyChangedFor(nameof(IsUnreadSorted))]
+    [NotifyPropertyChangedFor(nameof(IsParticipantsSorted))]
+    [NotifyPropertyChangedFor(nameof(IsActivitySorted))]
     private int _selectedSortIndex = 0;
 
     public string TitleSortHeader => SelectedSortIndex == 0 ? "Название ↑" : "Название";
     public string ParticipantsSortHeader => SelectedSortIndex == 2 ? "Участники ↓" : "Участники";
     public string UnreadSortHeader => SelectedSortIndex == 1 ? "Непрочитано ↓" : "Непрочитано";
     public string ActivitySortHeader => SelectedSortIndex == 3 ? "Активность ↓" : "Активность";
+
+    public bool IsTitleSorted => SelectedSortIndex == 0;
+    public bool IsUnreadSorted => SelectedSortIndex == 1;
+    public bool IsParticipantsSorted => SelectedSortIndex == 2;
+    public bool IsActivitySorted => SelectedSortIndex == 3;
 
     [ObservableProperty]
     private string _selectionCounterText = "Выбрано: 0 из 0";
@@ -123,37 +135,61 @@ public sealed partial class DialogListViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ChannelsHeaderText))]
+    [NotifyPropertyChangedFor(nameof(HasChannels))]
+    [NotifyPropertyChangedFor(nameof(CurrentCategoryCount))]
     [NotifyPropertyChangedFor(nameof(CurrentCategoryTitleWithCount))]
     private int _channelsCount = 0;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ChatsHeaderText))]
+    [NotifyPropertyChangedFor(nameof(HasChats))]
+    [NotifyPropertyChangedFor(nameof(CurrentCategoryCount))]
     [NotifyPropertyChangedFor(nameof(CurrentCategoryTitleWithCount))]
     private int _chatsCount = 0;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BotsHeaderText))]
+    [NotifyPropertyChangedFor(nameof(HasBots))]
+    [NotifyPropertyChangedFor(nameof(CurrentCategoryCount))]
     [NotifyPropertyChangedFor(nameof(CurrentCategoryTitleWithCount))]
     private int _botsCount = 0;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DeletedHeaderText))]
+    [NotifyPropertyChangedFor(nameof(HasDeleted))]
+    [NotifyPropertyChangedFor(nameof(CurrentCategoryCount))]
     [NotifyPropertyChangedFor(nameof(CurrentCategoryTitleWithCount))]
     private int _deletedCount = 0;
+
+    public bool HasChannels => ChannelsCount > 0;
+    public bool HasChats => ChatsCount > 0;
+    public bool HasBots => BotsCount > 0;
+    public bool HasDeleted => DeletedCount > 0;
 
     public string ChannelsHeaderText => $"Каналы ({ChannelsCount})";
     public string ChatsHeaderText => $"Чаты ({ChatsCount})";
     public string BotsHeaderText => $"Боты ({BotsCount})";
     public string DeletedHeaderText => $"Удалённые ({DeletedCount})";
 
-    public string CurrentCategoryTitleWithCount => CurrentCategory switch
+    public string CurrentCategoryTitle => CurrentCategory switch
     {
-        DialogCategoryTab.Channels => $"Каналы ({ChannelsCount})",
-        DialogCategoryTab.Chats => $"Чаты ({ChatsCount})",
-        DialogCategoryTab.Bots => $"Боты ({BotsCount})",
-        DialogCategoryTab.Deleted => $"Удалённые ({DeletedCount})",
+        DialogCategoryTab.Channels => "Каналы",
+        DialogCategoryTab.Chats => "Чаты",
+        DialogCategoryTab.Bots => "Боты",
+        DialogCategoryTab.Deleted => "Удалённые",
         _ => "Диалоги"
     };
+
+    public int CurrentCategoryCount => CurrentCategory switch
+    {
+        DialogCategoryTab.Channels => ChannelsCount,
+        DialogCategoryTab.Chats => ChatsCount,
+        DialogCategoryTab.Bots => BotsCount,
+        DialogCategoryTab.Deleted => DeletedCount,
+        _ => _allDialogs.Count
+    };
+
+    public string CurrentCategoryTitleWithCount => $"{CurrentCategoryTitle} ({CurrentCategoryCount})";
 
     public string BottomStatusBarText
     {
@@ -373,6 +409,8 @@ public sealed partial class DialogListViewModel : ViewModelBase
         OnPropertyChanged(nameof(ChatsHeaderText));
         OnPropertyChanged(nameof(BotsHeaderText));
         OnPropertyChanged(nameof(DeletedHeaderText));
+        OnPropertyChanged(nameof(CurrentCategoryTitle));
+        OnPropertyChanged(nameof(CurrentCategoryCount));
         OnPropertyChanged(nameof(CurrentCategoryTitleWithCount));
         OnPropertyChanged(nameof(BottomStatusBarText));
     }
@@ -438,7 +476,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
         // 4. Sorting
         query = SelectedSortIndex switch
         {
-            1 => query.OrderByDescending(d => d.UnreadCount).ThenBy(d => d.Title),       // По активности
+            1 => query.OrderByDescending(d => d.UnreadCount).ThenBy(d => d.Title),       // По непрочитанным
             2 => query.OrderByDescending(d => d.ParticipantCount).ThenBy(d => d.Title), // По участникам
             3 => query.OrderByDescending(d => d.LastActivity ?? DateTime.MinValue).ThenBy(d => d.Title), // По последней активности
             _ => query.OrderBy(d => d.Title, StringComparer.CurrentCultureIgnoreCase)   // По названию
@@ -528,6 +566,7 @@ public sealed partial class DialogListViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanRefresh));
         OnPropertyChanged(nameof(ShowEmpty));
         OnPropertyChanged(nameof(HasFilters));
+        OnPropertyChanged(nameof(HasNotificationArea));
         OnPropertyChanged(nameof(EmptyTitle));
         OnPropertyChanged(nameof(EmptyHint));
 
@@ -539,6 +578,8 @@ public sealed partial class DialogListViewModel : ViewModelBase
             : "Проверить выбор";
 
         OnPropertyChanged(nameof(BottomStatusBarText));
+        OnPropertyChanged(nameof(CurrentCategoryTitle));
+        OnPropertyChanged(nameof(CurrentCategoryCount));
         OnPropertyChanged(nameof(CurrentCategoryTitleWithCount));
 
         _isUpdatingAllSelected = true;
@@ -576,7 +617,6 @@ public sealed partial class DialogListViewModel : ViewModelBase
                     var path = await _telegramService.DownloadAvatarAsync(item.Model, ct);
                     if (!ct.IsCancellationRequested && path != null) item.AvatarLocalPath = path;
                 }
-                // Yield even on cache hits so keyboard and pointer input can run.
                 await Task.Yield();
             }
         }

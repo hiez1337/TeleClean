@@ -1,6 +1,6 @@
 using System;
-using System.Threading;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -27,6 +27,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
     IRecipient<AuthenticationStateChangedMessage>
 {
     private readonly ITelegramService _telegramService;
+    private readonly IConfigService? _configService;
     private CancellationTokenSource? _qrCts;
     private int _isInitializing;
 
@@ -50,16 +51,24 @@ public sealed partial class AuthViewModel : ViewModelBase,
     private string _twoFactorPassword = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(QrStatusTone))]
     private bool _isQrLoading = true;
 
+    public Models.StatusTone QrStatusTone => HasError
+        ? Models.StatusTone.Danger
+        : (IsQrLoading ? Models.StatusTone.Neutral : Models.StatusTone.Success);
+
     [ObservableProperty]
-    private string _qrStatusText = "Ожидание сканирования...";
+    private string _qrStatusText = "Ожидание сканирования…";
 
     [ObservableProperty]
     private ImageSource? _qrCodeImage;
 
     [ObservableProperty]
     private bool _isAuthenticated;
+
+    [ObservableProperty]
+    private bool _hasProxyConfigured;
 
     public bool IsRecoveryMode => CurrentMode == AuthMode.SessionRecovery;
     public bool IsQrMode => CurrentMode == AuthMode.QrCode;
@@ -69,11 +78,26 @@ public sealed partial class AuthViewModel : ViewModelBase,
     public bool IsCodeInputVisible => CurrentMode == AuthMode.CodeInput;
     public bool IsPhoneInputEnabled => CurrentMode == AuthMode.PhoneInput;
 
-    public AuthViewModel(ITelegramService telegramService, IDispatcherService dispatcher)
+    public AuthViewModel(
+        ITelegramService telegramService,
+        IDispatcherService dispatcher,
+        IConfigService? configService = null)
         : base(dispatcher)
     {
         _telegramService = telegramService ?? throw new ArgumentNullException(nameof(telegramService));
+        _configService = configService;
+        PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(HasError)) OnPropertyChanged(nameof(QrStatusTone));
+        };
+        RefreshProxyIndicator();
         WeakReferenceMessenger.Default.Register<AuthenticationStateChangedMessage>(this);
+    }
+
+    public void RefreshProxyIndicator()
+    {
+        if (_configService == null) return;
+        HasProxyConfigured = !string.IsNullOrWhiteSpace(_configService.CurrentConfig.ProxyUrl);
     }
 
     /// <summary>
@@ -87,6 +111,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
             return;
         }
 
+        RefreshProxyIndicator();
         CurrentMode = AuthMode.SessionRecovery;
         StatusMessage = "Восстанавливаем подключение к Telegram…";
         IsBusy = true;
@@ -131,7 +156,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
         QrCodeImage = null;
         IsQrLoading = true;
         ErrorMessage = null;
-        QrStatusText = "Генерация QR-кода...";
+        QrStatusText = "Генерация QR-кода…";
         StatusMessage = null;
 
         var source = new CancellationTokenSource();
@@ -215,7 +240,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
                 source.Invalidate();
                 QrCodeImage = source;
                 IsQrLoading = false;
-                QrStatusText = "QR-код готов к сканированию.";
+                QrStatusText = "QR-код готов к сканированию";
             }
             catch
             {
@@ -256,7 +281,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
 
         IsBusy = true;
         ErrorMessage = null;
-        StatusMessage = "Отправка кода подтверждения...";
+        StatusMessage = "Отправка кода подтверждения…";
 
         try
         {
@@ -303,7 +328,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
 
         IsBusy = true;
         ErrorMessage = null;
-        StatusMessage = "Проверка кода...";
+        StatusMessage = "Проверка кода…";
 
         try
         {
@@ -345,7 +370,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
 
         IsBusy = true;
         ErrorMessage = null;
-        StatusMessage = "Проверка пароля...";
+        StatusMessage = "Проверка пароля…";
 
         try
         {
@@ -394,6 +419,7 @@ public sealed partial class AuthViewModel : ViewModelBase,
                 TwoFactorPassword = string.Empty;
                 ErrorMessage = null;
                 StatusMessage = null;
+                RefreshProxyIndicator();
                 StartQrLogin();
             });
         }
