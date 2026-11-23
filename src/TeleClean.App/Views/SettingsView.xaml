@@ -2,16 +2,16 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:TeleClean.App.Controls">
-    <Grid Background="Transparent">
+    <Grid x:Name="SettingsRoot" Background="Transparent" SizeChanged="OnSettingsSizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Sticky Header & Closable Feedback Banners -->
-        <Grid Grid.Row="0" Padding="20,12,20,8">
+        <Grid x:Name="HeaderHost" Grid.Row="0" Padding="20,12,20,8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" MaxWidth="900"/>
+                <ColumnDefinition x:Name="HeaderWidthCol" Width="*" MaxWidth="900"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Spacing="8">
@@ -33,206 +33,210 @@
             </StackPanel>
         </Grid>
 
-        <!-- Scrollable Settings Cards -->
+        <!-- Responsive 1-Column (Compact/Standard) / 2-Column (Full-Screen) Scrollable Content -->
         <ScrollViewer Grid.Row="1"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollMode="Disabled"
                       HorizontalScrollBarVisibility="Disabled"
                       HorizontalContentAlignment="Stretch">
-            <Grid Padding="20,2,20,24">
+            <Grid x:Name="ContentHost" Padding="20,2,20,24" ColumnSpacing="20" RowSpacing="8">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MaxWidth="900"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition x:Name="LeftColumn" Width="*" MaxWidth="900"/>
+                    <ColumnDefinition x:Name="RightColumn" Width="0"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Spacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <!-- Appearance -->
-                <TextBlock Text="Оформление" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                <!-- Primary Column: Appearance, Bulk Operations, Connection -->
+                <StackPanel x:Name="LeftColumnStack" Grid.Row="0" Grid.Column="0" Spacing="8">
+                    <TextBlock Text="Оформление" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
 
-                <controls:SettingsCard Glyph="&#xE790;"
-                                       Header="Цветовая тема"
-                                       Description="Светлое, тёмное или системное оформление Windows">
-                    <controls:SettingsCard.ActionContent>
-                        <ComboBox MinWidth="184"
-                                  HorizontalAlignment="Stretch"
-                                  AutomationProperties.Name="Цветовая тема"
-                                  SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}">
-                            <ComboBoxItem Content="Как в Windows"/>
-                            <ComboBoxItem Content="Светлая"/>
-                            <ComboBoxItem Content="Тёмная"/>
-                        </ComboBox>
-                    </controls:SettingsCard.ActionContent>
-                </controls:SettingsCard>
+                    <controls:SettingsCard Glyph="&#xE790;"
+                                           Header="Цветовая тема"
+                                           Description="Светлое, тёмное или системное оформление Windows">
+                        <controls:SettingsCard.ActionContent>
+                            <ComboBox MinWidth="184"
+                                      HorizontalAlignment="Stretch"
+                                      AutomationProperties.Name="Цветовая тема"
+                                      SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}">
+                                <ComboBoxItem Content="Как в Windows"/>
+                                <ComboBoxItem Content="Светлая"/>
+                                <ComboBoxItem Content="Тёмная"/>
+                            </ComboBox>
+                        </controls:SettingsCard.ActionContent>
+                    </controls:SettingsCard>
 
-                <controls:SettingsCard Glyph="&#xE81E;"
-                                       Header="Материал окна"
-                                       Description="Полупрозрачный фон панели навигации и заголовка (Windows 11)">
-                    <controls:SettingsCard.ActionContent>
-                        <ComboBox MinWidth="184"
-                                  HorizontalAlignment="Stretch"
-                                  AutomationProperties.Name="Материал окна"
-                                  SelectedIndex="{x:Bind ViewModel.SelectedBackdropIndex, Mode=TwoWay}">
-                            <ComboBoxItem Content="Mica"/>
-                            <ComboBoxItem Content="Mica Alt"/>
-                            <ComboBoxItem Content="Акрил"/>
-                        </ComboBox>
-                    </controls:SettingsCard.ActionContent>
-                </controls:SettingsCard>
+                    <controls:SettingsCard Glyph="&#xE81E;"
+                                           Header="Материал окна"
+                                           Description="Mica, глубокий Mica Alt, полупрозрачный Акрил или сплошной фон">
+                        <controls:SettingsCard.ActionContent>
+                            <ComboBox MinWidth="184"
+                                      HorizontalAlignment="Stretch"
+                                      AutomationProperties.Name="Материал окна"
+                                      SelectedIndex="{x:Bind ViewModel.SelectedBackdropIndex, Mode=TwoWay}">
+                                <ComboBoxItem Content="Mica"/>
+                                <ComboBoxItem Content="Mica Alt"/>
+                                <ComboBoxItem Content="Акрил"/>
+                                <ComboBoxItem Content="Сплошной"/>
+                            </ComboBox>
+                        </controls:SettingsCard.ActionContent>
+                    </controls:SettingsCard>
 
-                <!-- Bulk Operations -->
-                <TextBlock Text="Массовые операции" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
+                    <TextBlock Text="Массовые операции" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
 
-                <Border Style="{StaticResource CardPanelStyle}" Padding="18,14">
-                    <StackPanel Spacing="10">
-                        <Grid ColumnSpacing="14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Width="34" Height="34" CornerRadius="8"
-                                    Background="{ThemeResource CardSurfaceSubtleBrush}"
-                                    BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1"
-                                    VerticalAlignment="Center">
-                                <FontIcon Glyph="&#xE916;" FontSize="15" Foreground="{ThemeResource BrandTextBrush}"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="Пауза между запросами" FontSize="14" FontWeight="SemiBold"/>
-                                <TextBlock Text="Снижает риск временных ограничений Telegram (FloodWait)" Style="{StaticResource RowMetadataStyle}"/>
-                            </StackPanel>
-                            <controls:StatusBadge Grid.Column="2"
-                                                  Text="{x:Bind ViewModel.DelaySecondsText, Mode=OneWay}"
-                                                  Tone="Accent"/>
-                        </Grid>
-                        <Slider AutomationProperties.Name="Пауза между запросами, секунды"
-                                Minimum="1" Maximum="10" StepFrequency="0.5"
-                                Value="{x:Bind ViewModel.DelayBetweenRequests, Mode=TwoWay}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Connection & API -->
-                <TextBlock Text="Подключение" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
-
-                <Expander Style="{StaticResource UnifiedExpanderStyle}">
-                    <Expander.Header>
-                        <Grid ColumnSpacing="14" Padding="0,6">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Width="34" Height="34" CornerRadius="8"
-                                    Background="{ThemeResource CardSurfaceSubtleBrush}"
-                                    BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1"
-                                    VerticalAlignment="Center">
-                                <FontIcon Glyph="&#xE774;" FontSize="15" Foreground="{ThemeResource BrandTextBrush}"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="Подключение и API Telegram" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                <TextBlock Text="MTProxy и пользовательские ключи Telegram API" Style="{StaticResource RowMetadataStyle}"/>
-                            </StackPanel>
-                            <controls:StatusBadge Grid.Column="2"
-                                                  Text="MTProxy активен"
-                                                  Tone="Accent"
-                                                  ShowDot="True"
-                                                  Visibility="{x:Bind ViewModel.HasProxyConfigured, Mode=OneWay}"/>
-                        </Grid>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Изменения подключения и API ключей применяются при следующем запуске приложения."
-                                   Style="{StaticResource SupportingTextStyle}"/>
-
-                        <PasswordBox Header="Ссылка MTProxy"
-                                     PlaceholderText="tg://proxy?server=...&amp;port=...&amp;secret=..."
-                                     Password="{x:Bind ViewModel.ProxyUrl, Mode=TwoWay}"
-                                     PasswordRevealMode="Peek"/>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Content="Сохранить прокси"
-                                    Style="{ThemeResource AccentButtonStyle}"
-                                    Command="{x:Bind ViewModel.SaveProxyCommand}"/>
-                            <Button Content="Отключить"
-                                    Command="{x:Bind ViewModel.ClearProxyCommand}"/>
-                        </StackPanel>
-
-                        <Border Height="1" Background="{ThemeResource SubtleDividerBrush}" Margin="0,4"/>
-
-                        <NumberBox Header="API ID" Minimum="0" Maximum="2147483647" Value="{x:Bind ViewModel.ApiId, Mode=TwoWay}"/>
-                        <PasswordBox Header="API Hash" Password="{x:Bind ViewModel.ApiHash, Mode=TwoWay}" PasswordRevealMode="Peek"/>
-                        <Button Content="Сохранить ключи" Command="{x:Bind ViewModel.SaveApiKeysCommand}"/>
-                    </StackPanel>
-                </Expander>
-
-                <!-- Data & Session -->
-                <TextBlock Text="Данные и сессия" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
-
-                <controls:SettingsCard Glyph="&#xE74D;"
-                                       Header="Кэш аватаров"
-                                       Description="Удалить локально сохранённые изображения профилей">
-                    <controls:SettingsCard.ActionContent>
-                        <Button Content="Очистить кэш" Command="{x:Bind ViewModel.ClearAvatarCacheCommand}"/>
-                    </controls:SettingsCard.ActionContent>
-                </controls:SettingsCard>
-
-                <controls:SettingsCard Glyph="&#xF3B1;"
-                                       Header="Сессия Telegram"
-                                       Description="{x:Bind ViewModel.SessionDescriptionText, Mode=OneWay}">
-                    <controls:SettingsCard.ActionContent>
-                        <Button Content="Выйти из аккаунта"
-                                Style="{StaticResource DestructiveButtonStyle}"
-                                Click="OnConfirmLogout"/>
-                    </controls:SettingsCard.ActionContent>
-                </controls:SettingsCard>
-
-                <!-- About & Local Storage -->
-                <TextBlock Text="О приложении" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
-
-                <Expander Style="{StaticResource UnifiedExpanderStyle}">
-                    <Expander.Header>
-                        <Grid ColumnSpacing="14" Padding="0,6">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Border Width="34" Height="34" CornerRadius="8"
-                                    Background="{ThemeResource CardSurfaceSubtleBrush}"
-                                    BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1"
-                                    VerticalAlignment="Center">
-                                <FontIcon Glyph="&#xE946;" FontSize="15" Foreground="{ThemeResource BrandTextBrush}"/>
-                            </Border>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="{x:Bind ViewModel.AppVersionText}" FontSize="14" FontWeight="SemiBold"/>
-                                <TextBlock Text="Хранение сессии и локальная папка данных" Style="{StaticResource RowMetadataStyle}"/>
-                            </StackPanel>
-                        </Grid>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="При обычном закрытии окна авторизация сохраняется. Для завершения сессии на сервере Telegram используйте «Выйти из аккаунта»."
-                                   Style="{StaticResource SupportingTextStyle}"/>
-                        <Border Style="{StaticResource SubtleTileStyle}">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Папка данных на этом устройстве" Style="{StaticResource RowMetadataStyle}"/>
-                                <TextBlock Text="{x:Bind ViewModel.DataDirectory}" FontSize="13" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
-                            </StackPanel>
-                        </Border>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button Command="{x:Bind ViewModel.OpenDataDirectoryCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <FontIcon Glyph="&#xE838;" FontSize="13"/>
-                                    <TextBlock Text="Открыть папку"/>
+                    <Border Style="{StaticResource CardPanelStyle}" Padding="18,14">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="34" Height="34" CornerRadius="8"
+                                        Background="{ThemeResource CardSurfaceSubtleBrush}"
+                                        BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE916;" FontSize="15" Foreground="{ThemeResource BrandTextBrush}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Пауза между запросами" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Снижает риск временных ограничений Telegram (FloodWait)" Style="{StaticResource RowMetadataStyle}"/>
                                 </StackPanel>
-                            </Button>
-                            <Button Click="OnCopyDataDirectory">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <FontIcon Glyph="&#xE8C8;" FontSize="13"/>
-                                    <TextBlock Text="Копировать путь"/>
-                                </StackPanel>
-                            </Button>
+                                <controls:StatusBadge Grid.Column="2"
+                                                      Text="{x:Bind ViewModel.DelaySecondsText, Mode=OneWay}"
+                                                      Tone="Accent"/>
+                            </Grid>
+                            <Slider AutomationProperties.Name="Пауза между запросами, секунды"
+                                    Minimum="1" Maximum="10" StepFrequency="0.5"
+                                    Value="{x:Bind ViewModel.DelayBetweenRequests, Mode=TwoWay}"/>
                         </StackPanel>
-                    </StackPanel>
-                </Expander>
+                    </Border>
+
+                    <TextBlock Text="Подключение" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
+
+                    <Expander x:Name="ConnectionExpander" Style="{StaticResource UnifiedExpanderStyle}">
+                        <Expander.Header>
+                            <Grid ColumnSpacing="14" Padding="0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="34" Height="34" CornerRadius="8"
+                                        Background="{ThemeResource CardSurfaceSubtleBrush}"
+                                        BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE774;" FontSize="15" Foreground="{ThemeResource BrandTextBrush}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Подключение и API Telegram" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                    <TextBlock Text="MTProxy и пользовательские ключи Telegram API" Style="{StaticResource RowMetadataStyle}"/>
+                                </StackPanel>
+                                <controls:StatusBadge Grid.Column="2"
+                                                      Text="MTProxy активен"
+                                                      Tone="Accent"
+                                                      ShowDot="True"
+                                                      Visibility="{x:Bind ViewModel.HasProxyConfigured, Mode=OneWay}"/>
+                            </Grid>
+                        </Expander.Header>
+
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Изменения подключения и API ключей применяются при следующем запуске приложения."
+                                       Style="{StaticResource SupportingTextStyle}"/>
+
+                            <PasswordBox Header="Ссылка MTProxy"
+                                         PlaceholderText="tg://proxy?server=...&amp;port=...&amp;secret=..."
+                                         Password="{x:Bind ViewModel.ProxyUrl, Mode=TwoWay}"
+                                         PasswordRevealMode="Peek"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Сохранить прокси"
+                                        Style="{ThemeResource AccentButtonStyle}"
+                                        Command="{x:Bind ViewModel.SaveProxyCommand}"/>
+                                <Button Content="Отключить"
+                                        Command="{x:Bind ViewModel.ClearProxyCommand}"/>
+                            </StackPanel>
+
+                            <Border Height="1" Background="{ThemeResource SubtleDividerBrush}" Margin="0,4"/>
+
+                            <NumberBox Header="API ID" Minimum="0" Maximum="2147483647" Value="{x:Bind ViewModel.ApiId, Mode=TwoWay}"/>
+                            <PasswordBox Header="API Hash" Password="{x:Bind ViewModel.ApiHash, Mode=TwoWay}" PasswordRevealMode="Peek"/>
+                            <Button Content="Сохранить ключи" Command="{x:Bind ViewModel.SaveApiKeysCommand}"/>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+
+                <!-- Secondary Column: Data, Session, About (moves right in wide/fullscreen mode) -->
+                <StackPanel x:Name="RightColumnStack" Grid.Row="1" Grid.Column="0" Spacing="8">
+                    <TextBlock Text="Данные и сессия" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
+
+                    <controls:SettingsCard Glyph="&#xE74D;"
+                                           Header="Кэш аватаров"
+                                           Description="Удалить локально сохранённые изображения профилей">
+                        <controls:SettingsCard.ActionContent>
+                            <Button Content="Очистить кэш" Command="{x:Bind ViewModel.ClearAvatarCacheCommand}"/>
+                        </controls:SettingsCard.ActionContent>
+                    </controls:SettingsCard>
+
+                    <controls:SettingsCard Glyph="&#xF3B1;"
+                                           Header="Сессия Telegram"
+                                           Description="{x:Bind ViewModel.SessionDescriptionText, Mode=OneWay}">
+                        <controls:SettingsCard.ActionContent>
+                            <Button Content="Выйти из аккаунта"
+                                    Style="{StaticResource DestructiveButtonStyle}"
+                                    Click="OnConfirmLogout"/>
+                        </controls:SettingsCard.ActionContent>
+                    </controls:SettingsCard>
+
+                    <TextBlock Text="О приложении" Style="{StaticResource GroupHeaderStyle}" AutomationProperties.HeadingLevel="Level2"/>
+
+                    <Expander x:Name="AboutExpander" Style="{StaticResource UnifiedExpanderStyle}">
+                        <Expander.Header>
+                            <Grid ColumnSpacing="14" Padding="0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Width="34" Height="34" CornerRadius="8"
+                                        Background="{ThemeResource CardSurfaceSubtleBrush}"
+                                        BorderBrush="{ThemeResource CardBorderBrush}" BorderThickness="1"
+                                        VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE946;" FontSize="15" Foreground="{ThemeResource BrandTextBrush}"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{x:Bind ViewModel.AppVersionText}" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Хранение сессии и локальная папка данных" Style="{StaticResource RowMetadataStyle}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Expander.Header>
+
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="При обычном закрытии окна авторизация сохраняется. Для завершения сессии на сервере Telegram используйте «Выйти из аккаунта»."
+                                       Style="{StaticResource SupportingTextStyle}"/>
+                            <Border Style="{StaticResource SubtleTileStyle}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Папка данных на этом устройстве" Style="{StaticResource RowMetadataStyle}"/>
+                                    <TextBlock Text="{x:Bind ViewModel.DataDirectory}" FontSize="13" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+                                </StackPanel>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Command="{x:Bind ViewModel.OpenDataDirectoryCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <FontIcon Glyph="&#xE838;" FontSize="13"/>
+                                        <TextBlock Text="Открыть папку"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="OnCopyDataDirectory">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <FontIcon Glyph="&#xE8C8;" FontSize="13"/>
+                                        <TextBlock Text="Копировать путь"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
             </Grid>
         </ScrollViewer>

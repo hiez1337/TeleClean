@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using TeleClean.App.Helpers;
 using TeleClean.App.Messages;
 using TeleClean.App.ViewModels;
 using TeleClean.App.Views;
@@ -25,6 +26,7 @@ public sealed partial class MainWindow : Window,
     IRecipient<ThemeChangedMessage>, IRecipient<BackdropChangedMessage>
 {
     private readonly AccessibilitySettings _accessibility = new();
+    private readonly WindowBackdropManager _backdropManager;
     private object? _lastDialogCategory;
     private bool _closing;
     private bool _shutdownComplete;
@@ -47,6 +49,8 @@ public sealed partial class MainWindow : Window,
         BulkExecutionVm.PropertyChanged += OnBulkExecutionPropertyChanged;
 
         InitializeComponent();
+        _backdropManager = new WindowBackdropManager(this, RootGrid);
+        Activated += OnWindowActivated;
 
         if (isDemoMode)
         {
@@ -91,12 +95,23 @@ public sealed partial class MainWindow : Window,
         }
     }
 
-    private void OnActualThemeChanged(FrameworkElement sender, object args) => UpdateTitleBarTheme();
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        _backdropManager.UpdateActivation(args.WindowActivationState != WindowActivationState.Deactivated);
+    }
+
+    private void OnActualThemeChanged(FrameworkElement sender, object args)
+    {
+        UpdateTitleBarTheme();
+        _backdropManager.UpdateTheme();
+    }
 
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        Activated -= OnWindowActivated;
         BulkExecutionVm.PropertyChanged -= OnBulkExecutionPropertyChanged;
         RootGrid.ActualThemeChanged -= OnActualThemeChanged;
+        _backdropManager.Dispose();
         WeakReferenceMessenger.Default.UnregisterAll(this);
         AuthViewControl.ViewModel.CancelQrLogin();
     }
@@ -206,12 +221,22 @@ public sealed partial class MainWindow : Window,
         await DialogListVm.LoadDialogsAsync();
     }
 
-    public void SetBackdrop(string backdropType) => SystemBackdrop = backdropType switch
+    private bool? _isUltraWidePane;
+
+    private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        "MicaAlt" => new MicaBackdrop { Kind = MicaKind.BaseAlt },
-        "Acrylic" => new DesktopAcrylicBackdrop(),
-        _ => new MicaBackdrop { Kind = MicaKind.Base }
-    };
+        if (e.NewSize.Width <= 0) return;
+        bool ultraWide = e.NewSize.Width >= 1400;
+        if (_isUltraWidePane == ultraWide) return;
+        _isUltraWidePane = ultraWide;
+        Navigation.OpenPaneLength = ultraWide ? 240 : 216;
+    }
+
+    public void SetBackdrop(string backdropType)
+    {
+        bool translucentActive = _backdropManager.Apply(backdropType);
+        SolidBackdropLayer.Visibility = translucentActive ? Visibility.Collapsed : Visibility.Visible;
+    }
 
     private void OnNavigationChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {

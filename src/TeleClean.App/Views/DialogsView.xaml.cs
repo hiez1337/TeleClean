@@ -17,6 +17,7 @@ public sealed partial class DialogsView : Page
 {
     private readonly UISettings _uiSettings = new();
     private bool? _isWide;
+    private bool? _isFullscreen;
     private bool? _isFooterStacked;
     private bool? _isCompactRefresh;
 
@@ -58,9 +59,16 @@ public sealed partial class DialogsView : Page
 
         double scale = _uiSettings.TextScaleFactor;
         bool wide = width >= 740 * scale;
-        if (_isWide != wide)
+        bool fullscreen = width >= 1220 * scale;
+
+        if (_isWide != wide || _isFullscreen != fullscreen)
         {
             _isWide = wide;
+            _isFullscreen = fullscreen;
+
+            Workspace.Padding = fullscreen ? new Thickness(28, 16, 28, 18) : new Thickness(20, 12, 20, 14);
+            ContentHost.RowSpacing = fullscreen ? 12 : 10;
+
             ComparisonHeading.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
             NameHeading.Visibility = wide ? Visibility.Visible : Visibility.Collapsed;
             SelectVisible.Content = wide ? null : "Выбрать видимые";
@@ -74,8 +82,8 @@ public sealed partial class DialogsView : Page
 
             FilterPickerColumn.Width = wide ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
             SortPickerColumn.Width = wide ? GridLength.Auto : new GridLength(1, GridUnitType.Star);
-            FilterPicker.MinWidth = wide ? 144 : 0;
-            SortPicker.MinWidth = wide ? 164 : 0;
+            FilterPicker.MinWidth = fullscreen ? 176 : (wide ? 144 : 0);
+            SortPicker.MinWidth = fullscreen ? 196 : (wide ? 164 : 0);
 
             ViewModel.ShowComparison = wide;
         }

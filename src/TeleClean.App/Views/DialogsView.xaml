@@ -3,10 +3,11 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:vm="using:TeleClean.App.ViewModels"
     xmlns:controls="using:TeleClean.App.Controls">
-    <Grid x:Name="Workspace" Background="Transparent" Padding="20,12,20,14" RowSpacing="10" SizeChanged="OnWorkspaceSizeChanged">
+    <Grid x:Name="Workspace" Background="Transparent" Padding="20,12,20,14" SizeChanged="OnWorkspaceSizeChanged">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnSearchShortcut"/>
         </Grid.KeyboardAccelerators>
+        <Grid x:Name="ContentHost" MaxWidth="1540" HorizontalAlignment="Stretch" RowSpacing="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -163,12 +164,12 @@
                             Content="{x:Bind ViewModel.TitleSortHeader, Mode=OneWay}"
                             Command="{x:Bind ViewModel.SortByTitleCommand}"
                             ToolTipService.ToolTip="По названию от А до Я"/>
-                    <Grid x:Name="ComparisonHeading" Grid.Column="3" ColumnSpacing="12">
+                    <Grid x:Name="ComparisonHeading" Grid.Column="3" ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="88"/>
-                            <ColumnDefinition Width="104"/>
                             <ColumnDefinition Width="96"/>
-                            <ColumnDefinition Width="108"/>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="104"/>
+                            <ColumnDefinition Width="114"/>
                         </Grid.ColumnDefinitions>
                         <Button Style="{StaticResource ColumnSortButtonStyle}"
                                 Margin="0,0,-6,0"
@@ -327,12 +328,12 @@
                                     </StackPanel>
 
                                     <!-- Wide-Window Comparison Columns -->
-                                    <Grid Grid.Column="3" ColumnSpacing="12" Visibility="{x:Bind ShowComparison, Mode=OneWay}">
+                                    <Grid Grid.Column="3" ColumnSpacing="14" Visibility="{x:Bind ShowComparison, Mode=OneWay}">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="88"/>
-                                            <ColumnDefinition Width="104"/>
                                             <ColumnDefinition Width="96"/>
-                                            <ColumnDefinition Width="108"/>
+                                            <ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="104"/>
+                                            <ColumnDefinition Width="114"/>
                                         </Grid.ColumnDefinitions>
 
                                         <TextBlock Text="{x:Bind ParticipantsText}" Style="{StaticResource NumericCellStyle}"/>
@@ -437,5 +438,6 @@
                 </StackPanel>
             </Grid>
         </Border>
+        </Grid>
     </Grid>
 </Page>

@@ -8,8 +8,8 @@
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalContentAlignment="Stretch"
                       HorizontalContentAlignment="Stretch">
-            <Grid Padding="24,20" VerticalAlignment="Center">
-                <StackPanel MaxWidth="680" HorizontalAlignment="Stretch" Spacing="18">
+            <Grid Padding="28,24" VerticalAlignment="Center">
+                <StackPanel MaxWidth="740" HorizontalAlignment="Stretch" Spacing="18">
                     <!-- Hero Brand Header -->
                     <Grid ColumnSpacing="14">
                         <Grid.ColumnDefinitions>
