@@ -15,6 +15,7 @@ public partial class App : Application
 {
     public static IServiceProvider Services { get; private set; } = null!;
     public static MainWindow MainWindow { get; private set; } = null!;
+    public static bool IsDemoMode { get; private set; }
 
     public App()
     {
@@ -25,12 +26,12 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
 
-        // Dispatcher service initialized with main UI thread queue
         services.AddSingleton<IDispatcherService>(new WinUIDispatcherService(DispatcherQueue.GetForCurrentThread()));
 
         var commandLine = Environment.GetCommandLineArgs();
         bool demoLogin = commandLine.Contains("--demo-login", StringComparer.Ordinal);
         bool demo = demoLogin || commandLine.Contains("--demo", StringComparer.Ordinal);
+        IsDemoMode = demo;
 
         if (demo)
         {
@@ -47,20 +48,18 @@ public partial class App : Application
         services.AddSingleton<ICacheService, CacheService>();
         services.AddSingleton<IBulkExecutionEngine, BulkExecutionEngine>();
 
-        // ViewModels
         services.AddSingleton<AuthViewModel>();
         services.AddSingleton<DialogListViewModel>();
         services.AddSingleton<BulkExecutionViewModel>();
         services.AddSingleton<SettingsViewModel>();
-        services.AddSingleton<MainViewModel>();
 
         Services = services.BuildServiceProvider();
 
         // Eagerly resolve BulkExecutionViewModel so WeakReferenceMessenger and engine event subscriptions
-        // are active immediately from application startup before any user interaction
+        // are active immediately from application startup before any user interaction.
         Services.GetRequiredService<BulkExecutionViewModel>();
 
-        MainWindow = new MainWindow();
+        MainWindow = new MainWindow(demo);
         if (demo) MainWindow.Title = "TeleClean · Пример без Telegram";
         MainWindow.Activate();
     }

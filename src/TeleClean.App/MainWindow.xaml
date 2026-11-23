@@ -1,40 +1,132 @@
 <Window x:Class="TeleClean.App.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:views="using:TeleClean.App.Views" Title="TeleClean">
-    <Window.SystemBackdrop><MicaBackdrop Kind="Base"/></Window.SystemBackdrop>
+    xmlns:views="using:TeleClean.App.Views"
+    Title="TeleClean">
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="Base"/>
+    </Window.SystemBackdrop>
+
     <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="F5" Invoked="OnRefreshShortcut"/>
         </Grid.KeyboardAccelerators>
-        <NavigationView x:Name="Navigation" Visibility="Collapsed"
-            PaneDisplayMode="Auto" ExpandedModeThresholdWidth="900" CompactModeThresholdWidth="660"
-            OpenPaneLength="176" IsBackButtonVisible="Collapsed" IsSettingsVisible="False"
-            DisplayModeChanged="OnNavigationDisplayModeChanged" SelectionChanged="OnNavigationChanged">
-            <NavigationView.PaneHeader>
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="12,0,0,0">
-                    <Border Background="{ThemeResource BrandBrush}" Width="32" Height="32" CornerRadius="9">
-                        <FontIcon Glyph="&#xE724;" FontSize="15" Foreground="{ThemeResource OnBrandBrush}"/>
+
+        <!-- Seamless Windows 11 Title Bar -->
+        <Grid Grid.Row="0" Padding="8,0,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="PaneToggleButton"
+                    Style="{StaticResource SubtleIconButtonStyle}"
+                    Visibility="Collapsed"
+                    VerticalAlignment="Center"
+                    Margin="0,0,4,0"
+                    Click="OnPaneToggleClick"
+                    AutomationProperties.Name="Переключить панель навигации"
+                    ToolTipService.ToolTip="Меню навигации">
+                <FontIcon Glyph="&#xE700;" FontSize="15"/>
+            </Button>
+
+            <Grid x:Name="AppTitleBar" Grid.Column="1" Background="Transparent" VerticalAlignment="Stretch">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="6,0,0,0">
+                    <Border Background="{ThemeResource BrandPrimaryBrush}" Width="24" Height="24" CornerRadius="6">
+                        <FontIcon Glyph="&#xE724;" FontSize="12" Foreground="{ThemeResource OnBrandBrush}"/>
                     </Border>
-                    <TextBlock Text="TeleClean" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="TeleClean" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Border x:Name="DemoBadge"
+                            Visibility="Collapsed"
+                            Background="{ThemeResource StatusAccentBgBrush}"
+                            CornerRadius="10"
+                            Padding="9,2"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="Пример без Telegram"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{ThemeResource StatusAccentFgBrush}"/>
+                    </Border>
                 </StackPanel>
-            </NavigationView.PaneHeader>
+            </Grid>
+        </Grid>
+
+        <!-- Main Authenticated Shell -->
+        <NavigationView x:Name="Navigation"
+            Grid.Row="1"
+            Visibility="Collapsed"
+            PaneDisplayMode="Auto"
+            ExpandedModeThresholdWidth="900"
+            CompactModeThresholdWidth="680"
+            OpenPaneLength="216"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            IsSettingsVisible="False"
+            DisplayModeChanged="OnNavigationDisplayModeChanged"
+            SelectionChanged="OnNavigationChanged">
             <NavigationView.MenuItems>
-                <NavigationViewItem x:Name="Channels" Tag="0" Content="{x:Bind DialogListVm.ChannelsHeaderText, Mode=OneWay}">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE789;"/></NavigationViewItem.Icon>
+                <NavigationViewItem x:Name="Channels" Tag="0" Content="Каналы"
+                                    AutomationProperties.Name="{x:Bind DialogListVm.ChannelsHeaderText, Mode=OneWay}">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE789;"/>
+                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge Value="{x:Bind DialogListVm.ChannelsCount, Mode=OneWay}"
+                                   Visibility="{x:Bind DialogListVm.HasChannels, Mode=OneWay}"
+                                   Style="{ThemeResource InformationalValueInfoBadgeStyle}"/>
+                    </NavigationViewItem.InfoBadge>
                 </NavigationViewItem>
-                <NavigationViewItem Tag="1" Content="{x:Bind DialogListVm.ChatsHeaderText, Mode=OneWay}" Icon="People"/>
-                <NavigationViewItem Tag="2" Content="{x:Bind DialogListVm.BotsHeaderText, Mode=OneWay}">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE950;"/></NavigationViewItem.Icon>
+                <NavigationViewItem Tag="1" Content="Чаты" Icon="People"
+                                    AutomationProperties.Name="{x:Bind DialogListVm.ChatsHeaderText, Mode=OneWay}">
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge Value="{x:Bind DialogListVm.ChatsCount, Mode=OneWay}"
+                                   Visibility="{x:Bind DialogListVm.HasChats, Mode=OneWay}"
+                                   Style="{ThemeResource InformationalValueInfoBadgeStyle}"/>
+                    </NavigationViewItem.InfoBadge>
                 </NavigationViewItem>
-                <NavigationViewItem Tag="3" Content="{x:Bind DialogListVm.DeletedHeaderText, Mode=OneWay}" Icon="Delete"/>
+                <NavigationViewItem Tag="2" Content="Боты"
+                                    AutomationProperties.Name="{x:Bind DialogListVm.BotsHeaderText, Mode=OneWay}">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE99A;"/>
+                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge Value="{x:Bind DialogListVm.BotsCount, Mode=OneWay}"
+                                   Visibility="{x:Bind DialogListVm.HasBots, Mode=OneWay}"
+                                   Style="{ThemeResource InformationalValueInfoBadgeStyle}"/>
+                    </NavigationViewItem.InfoBadge>
+                </NavigationViewItem>
+                <NavigationViewItem Tag="3" Content="Удалённые" Icon="Delete"
+                                    AutomationProperties.Name="{x:Bind DialogListVm.DeletedHeaderText, Mode=OneWay}">
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge Value="{x:Bind DialogListVm.DeletedCount, Mode=OneWay}"
+                                   Visibility="{x:Bind DialogListVm.HasDeleted, Mode=OneWay}"
+                                   Style="{ThemeResource InformationalValueInfoBadgeStyle}"/>
+                    </NavigationViewItem.InfoBadge>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
-                <NavigationViewItem x:Name="Operations" Tag="4" Content="{x:Bind BulkExecutionVm.OperationsHeaderText, Mode=OneWay}" Icon="List"/>
+                <NavigationViewItemSeparator/>
+                <NavigationViewItem x:Name="Operations" Tag="4" Content="Операции"
+                                    AutomationProperties.Name="{x:Bind BulkExecutionVm.OperationsHeaderText, Mode=OneWay}">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE9D5;"/>
+                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge Value="{x:Bind BulkExecutionVm.ActiveOperationsCount, Mode=OneWay}"
+                                   Visibility="{x:Bind BulkExecutionVm.IsOperationActive, Mode=OneWay}"
+                                   Style="{ThemeResource AttentionValueInfoBadgeStyle}"/>
+                    </NavigationViewItem.InfoBadge>
+                </NavigationViewItem>
                 <NavigationViewItem Tag="5" Content="Настройки" Icon="Setting"/>
             </NavigationView.FooterMenuItems>
             <Frame x:Name="ContentFrame" IsNavigationStackEnabled="False"/>
         </NavigationView>
-        <views:AuthView x:Name="AuthViewControl"/>
+
+        <!-- Sign-in View -->
+        <views:AuthView x:Name="AuthViewControl" Grid.Row="1"/>
     </Grid>
 </Window>

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.Messaging.Messages;
 using TeleClean.Core.Models;
@@ -11,16 +10,6 @@ namespace TeleClean.App.Messages;
 public sealed class AuthenticationStateChangedMessage : ValueChangedMessage<bool>
 {
     public AuthenticationStateChangedMessage(bool isAuthenticated) : base(isAuthenticated)
-    {
-    }
-}
-
-/// <summary>
-/// Fired to trigger navigation to a specific view/page.
-/// </summary>
-public sealed class NavigationMessage : ValueChangedMessage<string>
-{
-    public NavigationMessage(string targetPage) : base(targetPage)
     {
     }
 }

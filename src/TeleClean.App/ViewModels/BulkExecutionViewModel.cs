@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +8,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using TeleClean.App.Messages;
+using TeleClean.App.Models;
 using TeleClean.App.Services;
 using TeleClean.Core.Interfaces;
 using TeleClean.Core.Models;
@@ -38,11 +38,14 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     public ObservableCollection<BulkLogEntry> LogEntries { get; } = new();
     public ObservableCollection<BulkLogEntry> Logs => LogEntries;
     public bool HasLogs => LogEntries.Count > 0;
+    public int LogCount => LogEntries.Count;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgressStepShortText))]
     private int _currentIndex;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgressStepShortText))]
     private int _totalCount;
 
     [ObservableProperty]
@@ -53,6 +56,7 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     private double _progressPercentage;
 
     public string ProgressPercentageText => $"{(int)ProgressPercentage}%";
+    public string ProgressStepShortText => $"{CurrentIndex} / {TotalCount}";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWaitingOnRateLimit))]
@@ -62,6 +66,8 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     [NotifyPropertyChangedFor(nameof(HasStarted))]
     [NotifyPropertyChangedFor(nameof(CanStop))]
     [NotifyPropertyChangedFor(nameof(PauseButtonText))]
+    [NotifyPropertyChangedFor(nameof(PauseGlyph))]
+    [NotifyPropertyChangedFor(nameof(StateTone))]
     private BulkOperationState _currentState = BulkOperationState.Idle;
 
     [ObservableProperty]
@@ -71,7 +77,10 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     private int _successCount;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasErrors))]
     private int _errorCount;
+
+    public bool HasErrors => ErrorCount > 0;
 
     [ObservableProperty]
     private string _currentStatusDescription = "Операция готова к запуску";
@@ -94,6 +103,16 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     public bool CanStop => _executionCts is { IsCancellationRequested: false } &&
         CurrentState is BulkOperationState.Running or BulkOperationState.Paused or BulkOperationState.RateLimited;
     public string PauseButtonText => CurrentState == BulkOperationState.Paused ? "Продолжить" : "Пауза";
+    public string PauseGlyph => CurrentState == BulkOperationState.Paused ? "\uE768" : "\uE769";
+
+    public StatusTone StateTone => CurrentState switch
+    {
+        BulkOperationState.Running => StatusTone.Accent,
+        BulkOperationState.Paused or BulkOperationState.RateLimited => StatusTone.Warning,
+        BulkOperationState.Completed => StatusTone.Success,
+        BulkOperationState.Interrupted => StatusTone.Danger,
+        _ => StatusTone.Neutral
+    };
 
     public BulkExecutionViewModel(
         IBulkExecutionEngine engine,
@@ -122,23 +141,27 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     {
         if (_executionCts != null) return;
         ErrorMessage = null;
+        StatusMessage = null;
         _executionCts = new CancellationTokenSource();
         var ct = _executionCts.Token;
         OnPropertyChanged(nameof(IsOperationActive));
         OnPropertyChanged(nameof(OperationsHeaderText));
 
         LogEntries.Clear();
-        OnPropertyChanged(nameof(Logs));
         OnPropertyChanged(nameof(HasLogs));
+        OnPropertyChanged(nameof(LogCount));
         CurrentIndex = 0;
         TotalCount = items.Count;
         ActiveOperationsCount = items.Count;
         SuccessCount = 0;
         ErrorCount = 0;
         ProgressPercentage = 0;
+        ElapsedTimeText = "00:00:00";
+        ProgressStepText = $"Обработано 0 из {items.Count} (0%)";
+        SuccessErrorCounterText = "Успешно: 0 | Ошибок: 0";
         CurrentState = BulkOperationState.Running;
         StateBadgeText = "Выполняется";
-        CurrentStatusDescription = $"Запуск операции для {TotalCount} диалогов...";
+        CurrentStatusDescription = $"Запуск операции для {TotalCount} {DialogListViewModel.GetRussianPlural(TotalCount, "диалога", "диалогов", "диалогов")}…";
         CurrentItemTitle = items.Count > 0 ? items[0].Title : "Запуск...";
 
         _stopwatch.Restart();
@@ -184,7 +207,6 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
             OnPropertyChanged(nameof(IsOperationActive));
             OnPropertyChanged(nameof(OperationsHeaderText));
             OnPropertyChanged(nameof(CanStop));
-
         }
     }
 
@@ -220,7 +242,9 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
             switch (CurrentState)
             {
                 case BulkOperationState.Running:
-                    CurrentStatusDescription = $"Обработка: {CurrentItemTitle}";
+                    CurrentStatusDescription = string.IsNullOrWhiteSpace(CurrentItemTitle)
+                        ? "Выполняется обработка…"
+                        : $"Обработка: {CurrentItemTitle}";
                     StateBadgeText = "Выполняется";
                     break;
 
@@ -256,12 +280,12 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
         Dispatcher.Enqueue(() =>
         {
             LogEntries.Add(log);
-            OnPropertyChanged(nameof(Logs));
-            OnPropertyChanged(nameof(HasLogs));
             if (LogEntries.Count > 1000)
             {
                 LogEntries.RemoveAt(0);
             }
+            OnPropertyChanged(nameof(HasLogs));
+            OnPropertyChanged(nameof(LogCount));
         });
     }
 
@@ -283,6 +307,7 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
     [RelayCommand]
     public void Stop()
     {
+        if (!CanStop) return;
         CurrentStatusDescription = "Остановка после текущего запроса…";
         _engine.Stop();
         _executionCts?.Cancel();
@@ -309,7 +334,7 @@ public sealed partial class BulkExecutionViewModel : ViewModelBase,
         }
         catch
         {
-            // Clipboard access might be denied in headless or background context
+            ErrorMessage = "Не удалось скопировать журнал в буфер обмена.";
         }
     }
 

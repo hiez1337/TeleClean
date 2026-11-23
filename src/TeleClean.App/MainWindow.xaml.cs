@@ -1,18 +1,22 @@
 using System;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
-using Microsoft.UI.Windowing;
-using WinRT.Interop;
 using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.UI;
 using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using TeleClean.App.Messages;
 using TeleClean.App.ViewModels;
 using TeleClean.App.Views;
 using TeleClean.Core.Interfaces;
+using Windows.UI;
+using Windows.UI.ViewManagement;
+using WinRT.Interop;
 
 namespace TeleClean.App;
 
@@ -20,42 +24,81 @@ public sealed partial class MainWindow : Window,
     IRecipient<AuthenticationStateChangedMessage>, IRecipient<StartBulkExecutionMessage>,
     IRecipient<ThemeChangedMessage>, IRecipient<BackdropChangedMessage>
 {
+    private readonly AccessibilitySettings _accessibility = new();
     private object? _lastDialogCategory;
     private bool _closing;
     private bool _shutdownComplete;
+
+    private bool IsHighContrast()
+    {
+        try { return _accessibility.HighContrast; }
+        catch { return false; }
+    }
 
     public void ReturnToDialogs() => Navigation.SelectedItem = _lastDialogCategory ?? Channels;
 
     public DialogListViewModel DialogListVm { get; }
     public BulkExecutionViewModel BulkExecutionVm { get; }
 
-    public MainWindow()
+    public MainWindow(bool isDemoMode = false)
     {
         DialogListVm = App.Services.GetRequiredService<DialogListViewModel>();
         BulkExecutionVm = App.Services.GetRequiredService<BulkExecutionViewModel>();
-        BulkExecutionVm.PropertyChanged += (_, args) =>
-        {
-            if (args.PropertyName == nameof(BulkExecutionViewModel.IsOperationActive))
-                DialogListVm.SetOperationActive(BulkExecutionVm.IsOperationActive);
-        };
+        BulkExecutionVm.PropertyChanged += OnBulkExecutionPropertyChanged;
+
         InitializeComponent();
+
+        if (isDemoMode)
+        {
+            DemoBadge.Visibility = Visibility.Visible;
+        }
+
+        ConfigureTitleBar();
+
         var scale = GetDpiForWindow(WindowNative.GetWindowHandle(this)) / 96.0;
         var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         AppWindow.Resize(new Windows.Graphics.SizeInt32(
             Math.Min(workArea.Width, (int)(1100 * scale)),
             Math.Min(workArea.Height, (int)(750 * scale))));
+
         AppWindow.Closing += OnWindowClosing;
-        Closed += (_, _) =>
-        {
-            WeakReferenceMessenger.Default.UnregisterAll(this);
-            AuthViewControl.ViewModel.CancelQrLogin();
-        };
+        Closed += OnWindowClosed;
 
         WeakReferenceMessenger.Default.RegisterAll(this);
         var config = App.Services.GetRequiredService<IConfigService>().CurrentConfig;
-        RootGrid.ActualThemeChanged += (_, _) => UpdateTitleBarTheme();
+        RootGrid.ActualThemeChanged += OnActualThemeChanged;
+
         SetAppTheme(config.Theme);
         SetBackdrop(config.Backdrop);
+    }
+
+    private void ConfigureTitleBar()
+    {
+        if (AppWindowTitleBar.IsCustomizationSupported())
+        {
+            ExtendsContentIntoTitleBar = true;
+            AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+            SetTitleBar(AppTitleBar);
+        }
+    }
+
+    private void OnBulkExecutionPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(BulkExecutionViewModel.IsOperationActive))
+        {
+            bool active = BulkExecutionVm.IsOperationActive;
+            DispatcherQueue.TryEnqueue(() => DialogListVm.SetOperationActive(active));
+        }
+    }
+
+    private void OnActualThemeChanged(FrameworkElement sender, object args) => UpdateTitleBarTheme();
+
+    private void OnWindowClosed(object sender, WindowEventArgs args)
+    {
+        BulkExecutionVm.PropertyChanged -= OnBulkExecutionPropertyChanged;
+        RootGrid.ActualThemeChanged -= OnActualThemeChanged;
+        WeakReferenceMessenger.Default.UnregisterAll(this);
+        AuthViewControl.ViewModel.CancelQrLogin();
     }
 
     private async void OnWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
@@ -87,6 +130,9 @@ public sealed partial class MainWindow : Window,
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr window);
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr window, uint attribute, ref int value, int size);
+
     public void SetAppTheme(string theme)
     {
         RootGrid.RequestedTheme = theme?.ToLowerInvariant() switch
@@ -100,20 +146,57 @@ public sealed partial class MainWindow : Window,
 
     private void UpdateTitleBarTheme()
     {
-        // Preserve the system caption buttons and window behavior.
-        int dark = RootGrid.ActualTheme == ElementTheme.Dark ? 1 : 0;
-        _ = DwmSetWindowAttribute(WindowNative.GetWindowHandle(this), 20, ref dark, sizeof(int));
+        bool isDark = RootGrid.ActualTheme == ElementTheme.Dark;
+        int darkFlag = isDark ? 1 : 0;
+        _ = DwmSetWindowAttribute(WindowNative.GetWindowHandle(this), 20, ref darkFlag, sizeof(int));
+
+        if (!AppWindowTitleBar.IsCustomizationSupported()) return;
+
+        var titleBar = AppWindow.TitleBar;
+        if (IsHighContrast())
+        {
+            titleBar.ButtonBackgroundColor = null;
+            titleBar.ButtonInactiveBackgroundColor = null;
+            titleBar.ButtonForegroundColor = null;
+            titleBar.ButtonHoverForegroundColor = null;
+            titleBar.ButtonHoverBackgroundColor = null;
+            titleBar.ButtonPressedForegroundColor = null;
+            titleBar.ButtonPressedBackgroundColor = null;
+            titleBar.ButtonInactiveForegroundColor = null;
+            return;
+        }
+
+        titleBar.ButtonBackgroundColor = Colors.Transparent;
+        titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+
+        if (isDark)
+        {
+            titleBar.ButtonForegroundColor = Color.FromArgb(255, 240, 244, 248);
+            titleBar.ButtonHoverForegroundColor = Colors.White;
+            titleBar.ButtonHoverBackgroundColor = Color.FromArgb(26, 255, 255, 255);
+            titleBar.ButtonPressedForegroundColor = Color.FromArgb(220, 255, 255, 255);
+            titleBar.ButtonPressedBackgroundColor = Color.FromArgb(16, 255, 255, 255);
+            titleBar.ButtonInactiveForegroundColor = Color.FromArgb(130, 255, 255, 255);
+        }
+        else
+        {
+            titleBar.ButtonForegroundColor = Color.FromArgb(255, 28, 32, 38);
+            titleBar.ButtonHoverForegroundColor = Colors.Black;
+            titleBar.ButtonHoverBackgroundColor = Color.FromArgb(18, 0, 0, 0);
+            titleBar.ButtonPressedForegroundColor = Color.FromArgb(200, 0, 0, 0);
+            titleBar.ButtonPressedBackgroundColor = Color.FromArgb(10, 0, 0, 0);
+            titleBar.ButtonInactiveForegroundColor = Color.FromArgb(115, 0, 0, 0);
+        }
     }
 
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr window, uint attribute, ref int value, int size);
+    private void OnPaneToggleClick(object sender, RoutedEventArgs e)
+    {
+        Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
+    }
 
     private void OnNavigationDisplayModeChanged(NavigationView sender, NavigationViewDisplayModeChangedEventArgs args)
     {
         sender.IsPaneOpen = args.DisplayMode == NavigationViewDisplayMode.Expanded;
-        if (ContentFrame != null)
-            ContentFrame.Margin = args.DisplayMode == NavigationViewDisplayMode.Minimal
-                ? new Thickness(0, 48, 0, 0) : new Thickness(0);
     }
 
     private async void OnRefreshShortcut(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -152,9 +235,15 @@ public sealed partial class MainWindow : Window,
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            AuthViewControl.Visibility = message.Value ? Visibility.Collapsed : Visibility.Visible;
-            Navigation.Visibility = message.Value ? Visibility.Visible : Visibility.Collapsed;
-            if (message.Value) Navigation.SelectedItem = Channels;
+            bool authenticated = message.Value;
+            AuthViewControl.Visibility = authenticated ? Visibility.Collapsed : Visibility.Visible;
+            Navigation.Visibility = authenticated ? Visibility.Visible : Visibility.Collapsed;
+            PaneToggleButton.Visibility = authenticated ? Visibility.Visible : Visibility.Collapsed;
+
+            if (authenticated)
+            {
+                Navigation.SelectedItem = Channels;
+            }
             else
             {
                 Navigation.SelectedItem = null;
@@ -167,6 +256,9 @@ public sealed partial class MainWindow : Window,
     public void Receive(StartBulkExecutionMessage message) =>
         DispatcherQueue.TryEnqueue(() => Navigation.SelectedItem = Operations);
 
-    public void Receive(ThemeChangedMessage message) => SetAppTheme(message.Value);
-    public void Receive(BackdropChangedMessage message) => SetBackdrop(message.Value);
+    public void Receive(ThemeChangedMessage message) =>
+        DispatcherQueue.TryEnqueue(() => SetAppTheme(message.Value));
+
+    public void Receive(BackdropChangedMessage message) =>
+        DispatcherQueue.TryEnqueue(() => SetBackdrop(message.Value));
 }

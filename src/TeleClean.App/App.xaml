@@ -7,76 +7,320 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+
             <ResourceDictionary.ThemeDictionaries>
+                <!-- Dark Theme (Default) -->
                 <ResourceDictionary x:Key="Default">
-                    <SolidColorBrush x:Key="WorkspaceBrush" Color="#151E27"/>
-                    <SolidColorBrush x:Key="PanelBrush" Color="#1C2935"/>
-                    <SolidColorBrush x:Key="SelectionBrush" Color="#304B65"/>
-                    <SolidColorBrush x:Key="SelectionStrokeBrush" Color="#779CBF"/>
-                    <SolidColorBrush x:Key="BrandBrush" Color="#9BCFF7"/>
-                    <SolidColorBrush x:Key="OnBrandBrush" Color="#142E43"/>
+                    <SolidColorBrush x:Key="ContentCanvasBrush" Color="#661A1C20"/>
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#CC262930"/>
+                    <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="#99202329"/>
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#18FFFFFF"/>
+                    <SolidColorBrush x:Key="TableHeaderBrush" Color="#0CFFFFFF"/>
+                    <SolidColorBrush x:Key="SubtleDividerBrush" Color="#14FFFFFF"/>
+                    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="#0EFFFFFF"/>
+                    <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="#2638A3F1"/>
+                    <SolidColorBrush x:Key="RowSelectedBorderBrush" Color="#6638A3F1"/>
+
+                    <SolidColorBrush x:Key="BrandPrimaryBrush" Color="#38A3F1"/>
+                    <SolidColorBrush x:Key="BrandSubtleBrush" Color="#2438A3F1"/>
+                    <SolidColorBrush x:Key="BrandTextBrush" Color="#78C9FF"/>
+                    <SolidColorBrush x:Key="OnBrandBrush" Color="#071929"/>
+
+                    <SolidColorBrush x:Key="StatusNeutralBgBrush" Color="#14FFFFFF"/>
+                    <SolidColorBrush x:Key="StatusNeutralFgBrush" Color="#B6BEC9"/>
+                    <SolidColorBrush x:Key="StatusNeutralDotBrush" Color="#8E98A6"/>
+
+                    <SolidColorBrush x:Key="StatusAccentBgBrush" Color="#2638A3F1"/>
+                    <SolidColorBrush x:Key="StatusAccentFgBrush" Color="#7CCBFF"/>
+                    <SolidColorBrush x:Key="StatusAccentDotBrush" Color="#38A3F1"/>
+
+                    <SolidColorBrush x:Key="StatusSuccessBgBrush" Color="#202EC76E"/>
+                    <SolidColorBrush x:Key="StatusSuccessFgBrush" Color="#6CE59E"/>
+                    <SolidColorBrush x:Key="StatusSuccessDotBrush" Color="#39D97E"/>
+
+                    <SolidColorBrush x:Key="StatusWarningBgBrush" Color="#24F2B632"/>
+                    <SolidColorBrush x:Key="StatusWarningFgBrush" Color="#FAD16B"/>
+                    <SolidColorBrush x:Key="StatusWarningDotBrush" Color="#F2B632"/>
+
+                    <SolidColorBrush x:Key="StatusDangerBgBrush" Color="#26F05C5C"/>
+                    <SolidColorBrush x:Key="StatusDangerFgBrush" Color="#FF8F8F"/>
+                    <SolidColorBrush x:Key="StatusDangerDotBrush" Color="#F05C5C"/>
+
+                    <SolidColorBrush x:Key="DestructiveBgBrush" Color="#22E84C4C"/>
+                    <SolidColorBrush x:Key="DestructiveHoverBgBrush" Color="#36E84C4C"/>
+                    <SolidColorBrush x:Key="DestructivePressedBgBrush" Color="#48E84C4C"/>
+                    <SolidColorBrush x:Key="DestructiveBorderBrush" Color="#55F06A6A"/>
+                    <SolidColorBrush x:Key="DestructiveFgBrush" Color="#FF9494"/>
+
+                    <SolidColorBrush x:Key="QrFrameBorderBrush" Color="#24FFFFFF"/>
+                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#661A1C20"/>
+                    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#18FFFFFF"/>
+
+                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#CC262930"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#DE2D3139"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#E6323740"/>
+                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#B821242B"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#18FFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#18FFFFFF"/>
                 </ResourceDictionary>
+
+                <!-- Light Theme -->
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="WorkspaceBrush" Color="#F1F5F9"/>
-                    <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF"/>
-                    <SolidColorBrush x:Key="SelectionBrush" Color="#DBEBFC"/>
-                    <SolidColorBrush x:Key="SelectionStrokeBrush" Color="#507FA7"/>
-                    <SolidColorBrush x:Key="BrandBrush" Color="#134B76"/>
+                    <SolidColorBrush x:Key="ContentCanvasBrush" Color="#78FFFFFF"/>
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#FAFFFFFF"/>
+                    <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="#FFF4F6F9"/>
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#16000000"/>
+                    <SolidColorBrush x:Key="TableHeaderBrush" Color="#06000000"/>
+                    <SolidColorBrush x:Key="SubtleDividerBrush" Color="#10000000"/>
+                    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="#08000000"/>
+                    <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="#181477C8"/>
+                    <SolidColorBrush x:Key="RowSelectedBorderBrush" Color="#661477C8"/>
+
+                    <SolidColorBrush x:Key="BrandPrimaryBrush" Color="#1477C8"/>
+                    <SolidColorBrush x:Key="BrandSubtleBrush" Color="#161477C8"/>
+                    <SolidColorBrush x:Key="BrandTextBrush" Color="#0E5B9C"/>
                     <SolidColorBrush x:Key="OnBrandBrush" Color="#FFFFFF"/>
+
+                    <SolidColorBrush x:Key="StatusNeutralBgBrush" Color="#0D000000"/>
+                    <SolidColorBrush x:Key="StatusNeutralFgBrush" Color="#4F5965"/>
+                    <SolidColorBrush x:Key="StatusNeutralDotBrush" Color="#798492"/>
+
+                    <SolidColorBrush x:Key="StatusAccentBgBrush" Color="#181477C8"/>
+                    <SolidColorBrush x:Key="StatusAccentFgBrush" Color="#0E5B9C"/>
+                    <SolidColorBrush x:Key="StatusAccentDotBrush" Color="#1477C8"/>
+
+                    <SolidColorBrush x:Key="StatusSuccessBgBrush" Color="#16128245"/>
+                    <SolidColorBrush x:Key="StatusSuccessFgBrush" Color="#0C6936"/>
+                    <SolidColorBrush x:Key="StatusSuccessDotBrush" Color="#158A49"/>
+
+                    <SolidColorBrush x:Key="StatusWarningBgBrush" Color="#20B56C00"/>
+                    <SolidColorBrush x:Key="StatusWarningFgBrush" Color="#854D00"/>
+                    <SolidColorBrush x:Key="StatusWarningDotBrush" Color="#C97800"/>
+
+                    <SolidColorBrush x:Key="StatusDangerBgBrush" Color="#16C42B1C"/>
+                    <SolidColorBrush x:Key="StatusDangerFgBrush" Color="#AA1E11"/>
+                    <SolidColorBrush x:Key="StatusDangerDotBrush" Color="#C42B1C"/>
+
+                    <SolidColorBrush x:Key="DestructiveBgBrush" Color="#12C42B1C"/>
+                    <SolidColorBrush x:Key="DestructiveHoverBgBrush" Color="#22C42B1C"/>
+                    <SolidColorBrush x:Key="DestructivePressedBgBrush" Color="#30C42B1C"/>
+                    <SolidColorBrush x:Key="DestructiveBorderBrush" Color="#48C42B1C"/>
+                    <SolidColorBrush x:Key="DestructiveFgBrush" Color="#B01F12"/>
+
+                    <SolidColorBrush x:Key="QrFrameBorderBrush" Color="#20000000"/>
+                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#78FFFFFF"/>
+                    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#16000000"/>
+
+                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#FAFFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#FFF7F9FC"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#FFEDF1F6"/>
+                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#F2F8FAFC"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#16000000"/>
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#16000000"/>
                 </ResourceDictionary>
+
+                <!-- HighContrast Theme -->
                 <ResourceDictionary x:Key="HighContrast">
-                    <SolidColorBrush x:Key="WorkspaceBrush" Color="{ThemeResource SystemColorWindowColor}"/>
-                    <SolidColorBrush x:Key="PanelBrush" Color="{ThemeResource SystemColorWindowColor}"/>
-                    <SolidColorBrush x:Key="SelectionBrush" Color="{ThemeResource SystemColorWindowColor}"/>
-                    <SolidColorBrush x:Key="SelectionStrokeBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
-                    <SolidColorBrush x:Key="BrandBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
-                    <SolidColorBrush x:Key="OnBrandBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="ContentCanvasBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="TableHeaderBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="SubtleDividerBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="RowSelectedBorderBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+
+                    <SolidColorBrush x:Key="BrandPrimaryBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+                    <SolidColorBrush x:Key="BrandSubtleBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="BrandTextBrush" Color="{ThemeResource SystemColorHotlightColor}"/>
+                    <SolidColorBrush x:Key="OnBrandBrush" Color="{ThemeResource SystemColorHighlightTextColor}"/>
+
+                    <SolidColorBrush x:Key="StatusNeutralBgBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="StatusNeutralFgBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="StatusNeutralDotBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+
+                    <SolidColorBrush x:Key="StatusAccentBgBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+                    <SolidColorBrush x:Key="StatusAccentFgBrush" Color="{ThemeResource SystemColorHighlightTextColor}"/>
+                    <SolidColorBrush x:Key="StatusAccentDotBrush" Color="{ThemeResource SystemColorHighlightTextColor}"/>
+
+                    <SolidColorBrush x:Key="StatusSuccessBgBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="StatusSuccessFgBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="StatusSuccessDotBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+
+                    <SolidColorBrush x:Key="StatusWarningBgBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="StatusWarningFgBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="StatusWarningDotBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+
+                    <SolidColorBrush x:Key="StatusDangerBgBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="StatusDangerFgBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="StatusDangerDotBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+
+                    <SolidColorBrush x:Key="DestructiveBgBrush" Color="{ThemeResource SystemColorButtonFaceColor}"/>
+                    <SolidColorBrush x:Key="DestructiveHoverBgBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+                    <SolidColorBrush x:Key="DestructivePressedBgBrush" Color="{ThemeResource SystemColorHighlightColor}"/>
+                    <SolidColorBrush x:Key="DestructiveBorderBrush" Color="{ThemeResource SystemColorButtonTextColor}"/>
+                    <SolidColorBrush x:Key="DestructiveFgBrush" Color="{ThemeResource SystemColorButtonTextColor}"/>
+
+                    <SolidColorBrush x:Key="QrFrameBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+
+                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="{ThemeResource SystemColorWindowColor}"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
+
+            <!-- Structural Theme-Independent Converters -->
             <converters:InvertedBooleanToVisibilityConverter x:Key="InvertedBoolToVis"/>
+            <converters:PositiveIntToVisibilityConverter x:Key="PositiveIntToVis"/>
+            <converters:ZeroIntToVisibilityConverter x:Key="ZeroIntToVis"/>
+            <converters:DimmedToOpacityConverter x:Key="DimmedToOpacity"/>
+            <converters:LogEntryToToneConverter x:Key="LogEntryToTone"/>
+            <converters:LogEntryToBadgeTextConverter x:Key="LogEntryToBadgeText"/>
+            <converters:CleanLogMessageConverter x:Key="CleanLogMessage"/>
+
             <DataTemplate x:Key="WrappingLabel">
                 <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
             </DataTemplate>
-            <Style x:Key="ColumnSortButton" TargetType="Button">
-                <Setter Property="Background" Value="Transparent"/>
-                <Setter Property="BorderThickness" Value="0"/>
-                <Setter Property="Padding" Value="0"/>
+
+            <!-- Typography Ramp -->
+            <Style x:Key="PageTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="24"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+            <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="17"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+            <Style x:Key="GroupHeaderStyle" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="13"/>
-                <Setter Property="ContentTemplate" Value="{StaticResource WrappingLabel}"/>
                 <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="MinHeight" Value="36"/>
-                <Setter Property="VerticalAlignment" Value="Center"/>
-                <Setter Property="HorizontalAlignment" Value="Right"/>
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="Margin" Value="2,6,0,2"/>
             </Style>
-            <Style x:Key="WorkspaceTitle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="28"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="TextWrapping" Value="Wrap"/>
-            </Style>
-            <Style x:Key="SectionTitle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="20"/>
-                <Setter Property="FontWeight" Value="SemiBold"/>
-                <Setter Property="TextWrapping" Value="Wrap"/>
-            </Style>
-            <Style x:Key="SupportingText" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="14"/>
+            <Style x:Key="SupportingTextStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13"/>
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
                 <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
-            <Style x:Key="RowMetadata" TargetType="TextBlock" BasedOn="{StaticResource SupportingText}">
-                <Setter Property="FontSize" Value="13"/>
+            <Style x:Key="RowMetadataStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
             </Style>
-            <Style x:Key="NumericCell" TargetType="TextBlock">
+            <Style x:Key="NumericCellStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13"/>
                 <Setter Property="Typography.NumeralAlignment" Value="Tabular"/>
                 <Setter Property="TextAlignment" Value="Right"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
-                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="TextWrapping" Value="NoWrap"/>
             </Style>
-            <Style x:Key="WorkspacePanel" TargetType="Border">
-                <Setter Property="Background" Value="{ThemeResource PanelBrush}"/>
-                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/>
+
+            <!-- Unified Card & Expander Surfaces -->
+            <Style x:Key="CardPanelStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardSurfaceBrush}"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}"/>
                 <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="CornerRadius" Value="12"/>
+                <Setter Property="CornerRadius" Value="8"/>
+            </Style>
+            <Style x:Key="SubtleTileStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardSurfaceSubtleBrush}"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource CardBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="6"/>
+                <Setter Property="Padding" Value="12,10"/>
+            </Style>
+            <Style x:Key="UnifiedExpanderStyle" TargetType="Expander">
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="CornerRadius" Value="8"/>
+                <Setter Property="Padding" Value="18,14,18,18"/>
+            </Style>
+
+            <!-- Interactive Buttons -->
+            <Style x:Key="ColumnSortButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="6,4"/>
+                <Setter Property="CornerRadius" Value="4"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="MinHeight" Value="30"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="HorizontalAlignment" Value="Right"/>
+            </Style>
+
+            <Style x:Key="SubtleIconButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="CornerRadius" Value="6"/>
+                <Setter Property="Padding" Value="8,6"/>
+                <Setter Property="MinHeight" Value="32"/>
+                <Setter Property="MinWidth" Value="36"/>
+            </Style>
+
+            <Style x:Key="DestructiveButtonStyle" TargetType="Button">
+                <Setter Property="Background" Value="{ThemeResource DestructiveBgBrush}"/>
+                <Setter Property="BorderBrush" Value="{ThemeResource DestructiveBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Foreground" Value="{ThemeResource DestructiveFgBrush}"/>
+                <Setter Property="CornerRadius" Value="6"/>
+                <Setter Property="Padding" Value="14,6"/>
+                <Setter Property="MinHeight" Value="32"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="UseSystemFocusVisuals" Value="True"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <ContentPresenter x:Name="ContentPresenter"
+                                              Background="{TemplateBinding Background}"
+                                              BorderBrush="{TemplateBinding BorderBrush}"
+                                              BorderThickness="{TemplateBinding BorderThickness}"
+                                              CornerRadius="{TemplateBinding CornerRadius}"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentTransitions="{TemplateBinding ContentTransitions}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              Padding="{TemplateBinding Padding}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              AutomationProperties.AccessibilityView="Raw">
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal"/>
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="ContentPresenter.Background" Value="{ThemeResource DestructiveHoverBgBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="ContentPresenter.Background" Value="{ThemeResource DestructivePressedBgBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Target="ContentPresenter.Background" Value="{ThemeResource ControlFillColorDisabledBrush}"/>
+                                                <Setter Target="ContentPresenter.BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}"/>
+                                                <Setter Target="ContentPresenter.Foreground" Value="{ThemeResource TextFillColorDisabledBrush}"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </ContentPresenter>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
         </ResourceDictionary>
     </Application.Resources>

@@ -26,9 +26,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="../TeleClean.App/Models/StatusTone.cs" Link="Production/StatusTone.cs" />
+    <Compile Include="../TeleClean.App/Helpers/AvatarInitialsHelper.cs" Link="Production/AvatarInitialsHelper.cs" />
+    <Compile Include="../TeleClean.App/Helpers/ProxyUrlValidator.cs" Link="Production/ProxyUrlValidator.cs" />
     <Compile Include="../TeleClean.App/ViewModels/ViewModelBase.cs" Link="Production/ViewModelBase.cs" />
     <Compile Include="../TeleClean.App/ViewModels/DialogItemViewModel.cs" Link="Production/DialogItemViewModel.cs" />
     <Compile Include="../TeleClean.App/ViewModels/DialogListViewModel.cs" Link="Production/DialogListViewModel.cs" />
+    <Compile Include="../TeleClean.App/ViewModels/SettingsViewModel.cs" Link="Production/SettingsViewModel.cs" />
     <Compile Include="../TeleClean.App/Services/IDispatcherService.cs" Link="Production/IDispatcherService.cs" />
     <Compile Include="../TeleClean.App/Messages/Messages.cs" Link="Production/Messages.cs" />
   </ItemGroup>

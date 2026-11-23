@@ -1,156 +1,440 @@
 <Page x:Class="TeleClean.App.Views.DialogsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:vm="using:TeleClean.App.ViewModels" xmlns:controls="using:TeleClean.App.Controls">
-    <Grid x:Name="Workspace" Background="{ThemeResource WorkspaceBrush}" Padding="18,12" RowSpacing="8" SizeChanged="OnWorkspaceSizeChanged">
+    xmlns:vm="using:TeleClean.App.ViewModels"
+    xmlns:controls="using:TeleClean.App.Controls">
+    <Grid x:Name="Workspace" Background="Transparent" Padding="20,12,20,14" RowSpacing="10" SizeChanged="OnWorkspaceSizeChanged">
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnSearchShortcut"/>
+        </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <StackPanel Spacing="2">
-            <TextBlock Text="{x:Bind ViewModel.CurrentCategoryTitleWithCount, Mode=OneWay}"
-                ToolTipService.ToolTip="{x:Bind ViewModel.CategoryHint, Mode=OneWay}"
-                Style="{StaticResource WorkspaceTitle}" AutomationProperties.HeadingLevel="Level1"/>
-        </StackPanel>
 
-        <Grid Grid.Row="1" ColumnSpacing="8">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition x:Name="FilterColumn" Width="0"/></Grid.ColumnDefinitions>
-            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-            <TextBox x:Name="SearchBox" PlaceholderText="Название или @имя" AutomationProperties.Name="Поиск в категории"
-                ToolTipService.ToolTip="Поиск в категории (Ctrl+F)" IsSpellCheckEnabled="False"
-                Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                <TextBox.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnSearchShortcut"/>
-                </TextBox.KeyboardAccelerators>
-            </TextBox>
-            <Button Grid.Column="1" VerticalAlignment="Stretch" MinWidth="36" Padding="8,4"
-                Command="{x:Bind ViewModel.LoadDialogsCommand}" IsEnabled="{x:Bind ViewModel.CanRefresh, Mode=OneWay}"
-                AutomationProperties.Name="Обновить список" ToolTipService.ToolTip="Обновить список (F5)">
-                <FontIcon Glyph="&#xE72C;" FontSize="16"/>
+        <!-- Row 0: Category Header + Refresh Action -->
+        <Grid Grid.Row="0" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind ViewModel.CurrentCategoryTitle, Mode=OneWay}"
+                               Style="{StaticResource PageTitleStyle}"
+                               AutomationProperties.HeadingLevel="Level1"/>
+                    <Border Background="{ThemeResource StatusNeutralBgBrush}"
+                            CornerRadius="10"
+                            Padding="9,2"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.CurrentCategoryCount, Mode=OneWay}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Typography.NumeralAlignment="Tabular"
+                                   Foreground="{ThemeResource StatusNeutralFgBrush}"/>
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="{x:Bind ViewModel.CategoryHint, Mode=OneWay}"
+                           Style="{StaticResource SupportingTextStyle}"
+                           MaxLines="1"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTipService.ToolTip="{x:Bind ViewModel.CategoryHint, Mode=OneWay}"/>
+            </StackPanel>
+
+            <Button x:Name="RefreshButton"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Command="{x:Bind ViewModel.LoadDialogsCommand}"
+                    IsEnabled="{x:Bind ViewModel.CanRefresh, Mode=OneWay}"
+                    AutomationProperties.Name="Обновить список"
+                    ToolTipService.ToolTip="Обновить список (F5)">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <FontIcon Glyph="&#xE72C;" FontSize="13"/>
+                    <TextBlock x:Name="RefreshLabel" Text="Обновить" FontSize="13"/>
+                </StackPanel>
             </Button>
-            <Grid x:Name="FilterBar" Grid.Row="1" Grid.ColumnSpan="2" ColumnSpacing="8" Margin="0,6,0,0">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <ComboBox MinWidth="0" HorizontalAlignment="Stretch" ItemTemplate="{StaticResource WrappingLabel}" AutomationProperties.Name="Фильтр" ToolTipService.ToolTip="Фильтр"
-                    ItemsSource="{x:Bind ViewModel.FilterOptions}" SelectedIndex="{x:Bind ViewModel.SelectedFilterIndex, Mode=TwoWay}"/>
-                <ComboBox Grid.Column="1" MinWidth="0" HorizontalAlignment="Stretch" ItemTemplate="{StaticResource WrappingLabel}" AutomationProperties.Name="Сортировка" ToolTipService.ToolTip="Сортировка"
-                    ItemsSource="{x:Bind ViewModel.SortOptions}" SelectedIndex="{x:Bind ViewModel.SelectedSortIndex, Mode=TwoWay}"/>
+        </Grid>
+
+        <!-- Row 1: Search, Filter, Sort, and Reset -->
+        <Grid Grid.Row="1" ColumnSpacing="8" RowSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition x:Name="FilterColumn" Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBox x:Name="SearchBox"
+                     PlaceholderText="Поиск по названию или @имени…"
+                     AutomationProperties.Name="Поиск в категории"
+                     ToolTipService.ToolTip="Поиск в категории (Ctrl+F)"
+                     IsSpellCheckEnabled="False"
+                     Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+            <Grid x:Name="FilterBar" Grid.Column="1" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="FilterPickerColumn" Width="Auto"/>
+                    <ColumnDefinition x:Name="SortPickerColumn" Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ComboBox x:Name="FilterPicker"
+                          MinWidth="148"
+                          HorizontalAlignment="Stretch"
+                          ItemTemplate="{StaticResource WrappingLabel}"
+                          AutomationProperties.Name="Фильтр"
+                          ToolTipService.ToolTip="Фильтр"
+                          ItemsSource="{x:Bind ViewModel.FilterOptions}"
+                          SelectedIndex="{x:Bind ViewModel.SelectedFilterIndex, Mode=TwoWay}"/>
+                <ComboBox x:Name="SortPicker"
+                          Grid.Column="1"
+                          MinWidth="166"
+                          HorizontalAlignment="Stretch"
+                          ItemTemplate="{StaticResource WrappingLabel}"
+                          AutomationProperties.Name="Сортировка"
+                          ToolTipService.ToolTip="Сортировка"
+                          ItemsSource="{x:Bind ViewModel.SortOptions}"
+                          SelectedIndex="{x:Bind ViewModel.SelectedSortIndex, Mode=TwoWay}"/>
+                <Button Grid.Column="2"
+                        Visibility="{x:Bind ViewModel.HasFilters, Mode=OneWay}"
+                        Command="{x:Bind ViewModel.ClearFiltersCommand}"
+                        AutomationProperties.Name="Сбросить поиск и фильтр"
+                        ToolTipService.ToolTip="Сбросить поиск и фильтр">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE711;" FontSize="11"/>
+                        <TextBlock Text="Сбросить" FontSize="13"/>
+                    </StackPanel>
+                </Button>
             </Grid>
         </Grid>
 
-        <StackPanel Grid.Row="2" Spacing="6">
-            <InfoBar Title="Список недоступен" Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
-                Severity="Error" IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}" IsClosable="False"/>
-            <Grid ColumnSpacing="8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <TextBlock Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                    VerticalAlignment="Center" Style="{StaticResource SupportingText}" AutomationProperties.LiveSetting="Polite"/>
-                <HyperlinkButton Grid.Column="1" Content="Сбросить" Visibility="{x:Bind ViewModel.HasFilters, Mode=OneWay}"
-                    AutomationProperties.Name="Сбросить поиск и фильтр" ToolTipService.ToolTip="Сбросить поиск и фильтр"
-                    Command="{x:Bind ViewModel.ClearFiltersCommand}" Padding="4,0"/>
-            </Grid>
-            <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}"/>
+        <!-- Row 2: Conditional Error & Loading Strip (collapsed when idle to preserve vertical space) -->
+        <StackPanel Grid.Row="2" Spacing="6" Visibility="{x:Bind ViewModel.HasNotificationArea, Mode=OneWay}">
+            <InfoBar Title="Список недоступен"
+                     Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                     Severity="Error"
+                     IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                     IsClosable="False"/>
+            <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
+                         Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}"/>
         </StackPanel>
 
-        <Border Grid.Row="3" Style="{StaticResource WorkspacePanel}">
-            <Grid Padding="6,2">
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                <Grid MinHeight="40" Padding="8,0" ColumnSpacing="8"
-                      BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+        <!-- Row 3: Dialog Data Table Card -->
+        <Border Grid.Row="3" Style="{StaticResource CardPanelStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Table Header -->
+                <Grid MinHeight="38"
+                      Padding="18,0,18,0"
+                      ColumnSpacing="12"
+                      Background="{ThemeResource TableHeaderBrush}"
+                      CornerRadius="7,7,0,0"
+                      BorderThickness="0,0,0,1"
+                      BorderBrush="{ThemeResource SubtleDividerBrush}">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="32"/><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="32"/>
+                        <ColumnDefinition Width="36"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <CheckBox x:Name="SelectVisible" MinWidth="0" Padding="0" IsThreeState="False" ContentTemplate="{StaticResource WrappingLabel}"
-                        AutomationProperties.Name="Выбрать видимые" ToolTipService.ToolTip="Выбрать видимые"
-                        IsChecked="{x:Bind ViewModel.IsAllSelectedInView, Mode=OneWay}"
-                        IsEnabled="{x:Bind ViewModel.CanSelectVisible, Mode=OneWay}" Click="OnSelectVisible"/>
-                    <Button x:Name="NameHeading" Grid.Column="2" Style="{StaticResource ColumnSortButton}" HorizontalAlignment="Left"
-                        Content="{x:Bind ViewModel.TitleSortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortByTitleCommand}"
-                        ToolTipService.ToolTip="По названию от А до Я"/>
-                    <Grid x:Name="ComparisonHeading" Grid.Column="3" ColumnSpacing="8">
+                    <CheckBox x:Name="SelectVisible"
+                              MinWidth="0"
+                              Padding="0"
+                              IsThreeState="False"
+                              VerticalAlignment="Center"
+                              AutomationProperties.Name="Выбрать видимые"
+                              ToolTipService.ToolTip="Выбрать видимые"
+                              IsChecked="{x:Bind ViewModel.IsAllSelectedInView, Mode=OneWay}"
+                              IsEnabled="{x:Bind ViewModel.CanSelectVisible, Mode=OneWay}"
+                              Click="OnSelectVisible"/>
+                    <Button x:Name="NameHeading"
+                            Grid.Column="2"
+                            Style="{StaticResource ColumnSortButtonStyle}"
+                            HorizontalAlignment="Left"
+                            Margin="-6,0,0,0"
+                            Content="{x:Bind ViewModel.TitleSortHeader, Mode=OneWay}"
+                            Command="{x:Bind ViewModel.SortByTitleCommand}"
+                            ToolTipService.ToolTip="По названию от А до Я"/>
+                    <Grid x:Name="ComparisonHeading" Grid.Column="3" ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="86"/><ColumnDefinition Width="106"/><ColumnDefinition Width="132"/><ColumnDefinition Width="112"/>
+                            <ColumnDefinition Width="88"/>
+                            <ColumnDefinition Width="104"/>
+                            <ColumnDefinition Width="96"/>
+                            <ColumnDefinition Width="108"/>
                         </Grid.ColumnDefinitions>
-                        <Button Style="{StaticResource ColumnSortButton}" Content="{x:Bind ViewModel.ParticipantsSortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortBySubscribersCommand}" ToolTipService.ToolTip="По числу участников, сначала больше"/>
-                        <Button Grid.Column="1" Style="{StaticResource ColumnSortButton}" Content="{x:Bind ViewModel.UnreadSortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortByUnreadCommand}" ToolTipService.ToolTip="По числу непрочитанных, сначала больше"/>
-                        <Button Grid.Column="2" Style="{StaticResource ColumnSortButton}" Content="{x:Bind ViewModel.ActivitySortHeader, Mode=OneWay}" Command="{x:Bind ViewModel.SortByActivityCommand}" ToolTipService.ToolTip="По последней активности, сначала новые"/>
-                        <TextBlock Grid.Column="3" Text="Статус" TextAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap"/>
+                        <Button Style="{StaticResource ColumnSortButtonStyle}"
+                                Margin="0,0,-6,0"
+                                Content="{x:Bind ViewModel.ParticipantsSortHeader, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.SortBySubscribersCommand}"
+                                ToolTipService.ToolTip="По числу участников, сначала больше"/>
+                        <Button Grid.Column="1"
+                                Style="{StaticResource ColumnSortButtonStyle}"
+                                Margin="0,0,-6,0"
+                                Content="{x:Bind ViewModel.UnreadSortHeader, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.SortByUnreadCommand}"
+                                ToolTipService.ToolTip="По числу непрочитанных, сначала больше"/>
+                        <Button Grid.Column="2"
+                                Style="{StaticResource ColumnSortButtonStyle}"
+                                Margin="0,0,-6,0"
+                                Content="{x:Bind ViewModel.ActivitySortHeader, Mode=OneWay}"
+                                Command="{x:Bind ViewModel.SortByActivityCommand}"
+                                ToolTipService.ToolTip="По последней активности, сначала новые"/>
+                        <TextBlock Grid.Column="3"
+                                   Text="Статус"
+                                   TextAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   FontWeight="SemiBold"
+                                   FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </Grid>
                 </Grid>
-                <ListView Grid.Row="1" SelectionMode="None" ItemsSource="{x:Bind ViewModel.VisibleDialogs, Mode=OneWay}"
-                    AutomationProperties.Name="Диалоги текущей категории">
+
+                <!-- Virtualized Dialog Rows -->
+                <ListView Grid.Row="1"
+                          SelectionMode="None"
+                          Padding="0,2"
+                          ItemsSource="{x:Bind ViewModel.VisibleDialogs, Mode=OneWay}"
+                          AutomationProperties.Name="Диалоги текущей категории">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="MinHeight" Value="0"/>
                             <Setter Property="AutomationProperties.Name" Value="{Binding Title}"/>
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListViewItem">
+                                        <ListViewItemPresenter
+                                            ContentMargin="0"
+                                            CornerRadius="6"
+                                            SelectionIndicatorVisualEnabled="False"
+                                            PointerOverBackground="{ThemeResource RowHoverBackgroundBrush}"
+                                            PressedBackground="{ThemeResource RowHoverBackgroundBrush}"
+                                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="vm:DialogItemViewModel">
-                            <Grid MinHeight="49" ColumnSpacing="8" Padding="8,4" CornerRadius="5" Tapped="OnRowTapped"
-                                  Background="Transparent">
+                            <Grid MinHeight="50"
+                                  Background="Transparent"
+                                  Tapped="OnRowTapped"
+                                  Opacity="{x:Bind IsDimmed, Converter={StaticResource DimmedToOpacity}, Mode=OneWay}">
                                 <Grid.ContextFlyout>
                                     <MenuFlyout>
-                                        <MenuFlyoutItem Text="Сведения о диалоге" Tag="{x:Bind}" Click="OnShowDialogDetails"/>
+                                        <MenuFlyoutItem Text="Сведения о диалоге" Tag="{x:Bind}" Click="OnShowDialogDetails">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE946;"/></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem Text="Копировать название" Tag="{x:Bind}" Click="OnCopyDialogTitle">
+                                            <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;"/></MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
                                     </MenuFlyout>
                                 </Grid.ContextFlyout>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="32"/><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.ColumnSpan="4" Margin="-8,0" CornerRadius="5"
-                                    BorderBrush="{ThemeResource SelectionStrokeBrush}" BorderThickness="2,1,1,1"
-                                    Background="{ThemeResource SelectionBrush}" IsHitTestVisible="False" Visibility="{x:Bind IsSelected, Mode=OneWay}"/>
-                                <CheckBox MinWidth="0" Padding="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" ToolTipService.ToolTip="{x:Bind Title}"
-                                          IsEnabled="{x:Bind CanToggle, Mode=OneWay}" AutomationProperties.Name="{x:Bind Title}"/>
-                                <controls:AvatarControl Grid.Column="1" Width="30" Height="30" VerticalAlignment="Center"
-                                    Title="{x:Bind Title}" AvatarPath="{x:Bind AvatarLocalPath, Mode=OneWay}" IsDimmed="{x:Bind IsDimmed, Mode=OneWay}"/>
-                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
-                                    <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" MaxLines="2" TextWrapping="Wrap"
-                                        TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind Title}"/>
-                                    <TextBlock Text="{x:Bind CompactMetrics}" Style="{StaticResource RowMetadata}" Visibility="{x:Bind ShowCompactDetails, Mode=OneWay}"
-                                        Typography.NumeralAlignment="Tabular"/>
-                                    <TextBlock Text="{x:Bind DisplayStatus, Mode=OneWay}" Style="{StaticResource RowMetadata}" Visibility="{x:Bind ShowCompactDetails, Mode=OneWay}"/>
-                                    <TextBlock Text="{x:Bind UsernameFormatted}" Style="{StaticResource RowMetadata}" TextWrapping="NoWrap"
-                                        Visibility="{x:Bind ShowComparisonUsername, Mode=OneWay}"
-                                        TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{x:Bind UsernameFormatted}"/>
-                                </StackPanel>
-                                <Grid Grid.Column="3" ColumnSpacing="8" Visibility="{x:Bind ShowComparison, Mode=OneWay}">
+
+                                <!-- Row Divider -->
+                                <Border Height="1"
+                                        VerticalAlignment="Bottom"
+                                        Margin="18,0"
+                                        Background="{ThemeResource SubtleDividerBrush}"
+                                        IsHitTestVisible="False"/>
+
+                                <!-- Selected Row Highlight + Left Accent Pill -->
+                                <Border Margin="6,2,12,2"
+                                        CornerRadius="6"
+                                        Background="{ThemeResource RowSelectedBackgroundBrush}"
+                                        BorderBrush="{ThemeResource RowSelectedBorderBrush}"
+                                        BorderThickness="1"
+                                        IsHitTestVisible="False"
+                                        Visibility="{x:Bind IsSelected, Mode=OneWay}"/>
+                                <Border Width="3"
+                                        Height="24"
+                                        CornerRadius="2"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Margin="7,0,0,0"
+                                        Background="{ThemeResource BrandPrimaryBrush}"
+                                        IsHitTestVisible="False"
+                                        Visibility="{x:Bind IsSelected, Mode=OneWay}"/>
+
+                                <!-- Exact Aligned Row Columns -->
+                                <Grid Padding="18,6,18,6" ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="86"/><ColumnDefinition Width="106"/><ColumnDefinition Width="132"/><ColumnDefinition Width="112"/>
+                                        <ColumnDefinition Width="32"/>
+                                        <ColumnDefinition Width="36"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{x:Bind ParticipantsText}" Style="{StaticResource NumericCell}"/>
-                                    <TextBlock Grid.Column="1" Text="{x:Bind UnreadCount}" Style="{StaticResource NumericCell}"/>
-                                    <TextBlock Grid.Column="2" Text="{x:Bind ActivityDateText}" Style="{StaticResource NumericCell}"/>
-                                    <TextBlock Grid.Column="3" Text="{x:Bind DisplayStatus, Mode=OneWay}" TextAlignment="Right"
-                                        VerticalAlignment="Center" Style="{StaticResource RowMetadata}"/>
+
+                                    <CheckBox MinWidth="0"
+                                              Padding="0"
+                                              VerticalAlignment="Center"
+                                              IsChecked="{x:Bind IsSelected, Mode=TwoWay}"
+                                              IsEnabled="{x:Bind CanToggle, Mode=OneWay}"
+                                              ToolTipService.ToolTip="{x:Bind Title}"
+                                              AutomationProperties.Name="{x:Bind Title}"/>
+
+                                    <controls:AvatarControl Grid.Column="1"
+                                                            Width="34" Height="34"
+                                                            VerticalAlignment="Center"
+                                                            Title="{x:Bind Title}"
+                                                            AvatarPath="{x:Bind AvatarLocalPath, Mode=OneWay}"
+                                                            IsDimmed="{x:Bind IsDimmed, Mode=OneWay}"/>
+
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{x:Bind Title}"
+                                                   FontSize="13.5"
+                                                   FontWeight="SemiBold"
+                                                   MaxLines="2"
+                                                   TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{x:Bind Title}"/>
+                                        <TextBlock Text="{x:Bind UsernameFormatted}"
+                                                   Style="{StaticResource RowMetadataStyle}"
+                                                   TextWrapping="NoWrap"
+                                                   Visibility="{x:Bind ShowComparisonUsername, Mode=OneWay}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{x:Bind UsernameFormatted}"/>
+
+                                        <!-- Compact Narrow-Window Metadata & Inline Pills -->
+                                        <TextBlock Text="{x:Bind CompactSubtitle}"
+                                                   Style="{StaticResource RowMetadataStyle}"
+                                                   Visibility="{x:Bind ShowCompactDetails, Mode=OneWay}"
+                                                   Typography.NumeralAlignment="Tabular"/>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="6"
+                                                    Margin="0,3,0,0"
+                                                    Visibility="{x:Bind ShowCompactDetails, Mode=OneWay}">
+                                            <controls:StatusBadge Text="{x:Bind CleanStatusText, Mode=OneWay}"
+                                                                  Tone="{x:Bind StatusTone, Mode=OneWay}"
+                                                                  ShowDot="{x:Bind ShowStatusDot, Mode=OneWay}"/>
+                                            <controls:StatusBadge Text="{x:Bind UnreadBadgeText}"
+                                                                  Tone="Accent"
+                                                                  Visibility="{x:Bind HasUnread}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Wide-Window Comparison Columns -->
+                                    <Grid Grid.Column="3" ColumnSpacing="12" Visibility="{x:Bind ShowComparison, Mode=OneWay}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="88"/>
+                                            <ColumnDefinition Width="104"/>
+                                            <ColumnDefinition Width="96"/>
+                                            <ColumnDefinition Width="108"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Text="{x:Bind ParticipantsText}" Style="{StaticResource NumericCellStyle}"/>
+
+                                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                                            <controls:StatusBadge HorizontalAlignment="Right"
+                                                                  Text="{x:Bind UnreadBadgeText}"
+                                                                  Tone="Accent"
+                                                                  Visibility="{x:Bind HasUnread}"/>
+                                            <TextBlock Text="—"
+                                                       Style="{StaticResource NumericCellStyle}"
+                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                       Visibility="{x:Bind UnreadCount, Converter={StaticResource ZeroIntToVis}}"/>
+                                        </Grid>
+
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{x:Bind ActivityDateText}"
+                                                   Style="{StaticResource NumericCellStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                                        <controls:StatusBadge Grid.Column="3"
+                                                              HorizontalAlignment="Right"
+                                                              Text="{x:Bind CleanStatusText, Mode=OneWay}"
+                                                              Tone="{x:Bind StatusTone, Mode=OneWay}"
+                                                              ShowDot="{x:Bind ShowStatusDot, Mode=OneWay}"/>
+                                    </Grid>
                                 </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
                 </ListView>
-                <StackPanel Grid.Row="1" Visibility="{x:Bind ViewModel.ShowEmpty, Mode=OneWay}" MaxWidth="330"
-                    VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8" Margin="12">
-                    <FontIcon Glyph="&#xE721;" FontSize="23" Foreground="{ThemeResource BrandBrush}"/>
-                    <TextBlock Text="{x:Bind ViewModel.EmptyTitle, Mode=OneWay}" Style="{StaticResource SectionTitle}" TextAlignment="Center"/>
-                    <TextBlock Text="{x:Bind ViewModel.EmptyHint, Mode=OneWay}" Style="{StaticResource SupportingText}" TextAlignment="Center"/>
-                    <Button Content="Сбросить фильтры" ContentTemplate="{StaticResource WrappingLabel}" HorizontalAlignment="Center" Command="{x:Bind ViewModel.ClearFiltersCommand}"
-                        Visibility="{x:Bind ViewModel.HasFilters, Mode=OneWay}"/>
+
+                <!-- Empty State -->
+                <StackPanel Grid.Row="1"
+                            Visibility="{x:Bind ViewModel.ShowEmpty, Mode=OneWay}"
+                            MaxWidth="360"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            Spacing="10"
+                            Margin="20">
+                    <Border Width="48" Height="48" CornerRadius="24" Background="{ThemeResource BrandSubtleBrush}" HorizontalAlignment="Center">
+                        <FontIcon Glyph="&#xE721;" FontSize="20" Foreground="{ThemeResource BrandTextBrush}"/>
+                    </Border>
+                    <TextBlock Text="{x:Bind ViewModel.EmptyTitle, Mode=OneWay}" Style="{StaticResource SectionTitleStyle}" TextAlignment="Center"/>
+                    <TextBlock Text="{x:Bind ViewModel.EmptyHint, Mode=OneWay}" Style="{StaticResource SupportingTextStyle}" TextAlignment="Center"/>
+                    <Button Content="Сбросить фильтры"
+                            HorizontalAlignment="Center"
+                            Command="{x:Bind ViewModel.ClearFiltersCommand}"
+                            Visibility="{x:Bind ViewModel.HasFilters, Mode=OneWay}"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <Border Grid.Row="4" Style="{StaticResource WorkspacePanel}" Padding="10,6">
-            <Grid ColumnSpacing="8">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="ClearColumn" Width="Auto"/><ColumnDefinition x:Name="ReviewColumn" Width="Auto"/></Grid.ColumnDefinitions>
-                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                <TextBlock x:Name="SelectionSummary" Text="{x:Bind ViewModel.SelectionCounterText, Mode=OneWay}" FontWeight="SemiBold"
-                    Typography.NumeralAlignment="Tabular" VerticalAlignment="Center" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-                <Button x:Name="ClearSelection" Grid.Column="1" Content="Снять выбор" Command="{x:Bind ViewModel.DeselectAllCommand}"
-                    VerticalAlignment="Center" ContentTemplate="{StaticResource WrappingLabel}" Visibility="{x:Bind ViewModel.CanExecuteAction, Mode=OneWay}"/>
-                <Button x:Name="ReviewSelection" Grid.Column="2" Content="{x:Bind ViewModel.ActionButtonText, Mode=OneWay}"
-                    ContentTemplate="{StaticResource WrappingLabel}" HorizontalAlignment="Right" VerticalAlignment="Center"
-                    Style="{ThemeResource AccentButtonStyle}" IsEnabled="{x:Bind ViewModel.CanExecuteAction, Mode=OneWay}"
-                    Click="OnReviewSelection"/>
+        <!-- Row 4: Action Footer Bar -->
+        <Border Grid.Row="4" Style="{StaticResource CardPanelStyle}" Padding="14,9">
+            <Grid ColumnSpacing="10" RowSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition x:Name="FooterActionsColumn" Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel x:Name="SelectionSummaryPanel" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind ViewModel.SelectionCounterText, Mode=OneWay}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Typography.NumeralAlignment="Tabular"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite"/>
+                    <TextBlock x:Name="FooterStatusText"
+                               Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                               Style="{StaticResource RowMetadataStyle}"
+                               VerticalAlignment="Center"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               Visibility="{x:Bind ViewModel.HasStatusMessage, Mode=OneWay}"/>
+                </StackPanel>
+
+                <StackPanel x:Name="FooterActionsPanel"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            Spacing="8"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <Button x:Name="ClearSelection"
+                            Content="Снять выбор"
+                            Command="{x:Bind ViewModel.DeselectAllCommand}"
+                            Visibility="{x:Bind ViewModel.CanExecuteAction, Mode=OneWay}"/>
+                    <Button x:Name="ReviewSelection"
+                            Style="{ThemeResource AccentButtonStyle}"
+                            IsEnabled="{x:Bind ViewModel.CanExecuteAction, Mode=OneWay}"
+                            Click="OnReviewSelection">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <FontIcon Glyph="&#xE73E;" FontSize="13"/>
+                            <TextBlock Text="{x:Bind ViewModel.ActionButtonText, Mode=OneWay}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

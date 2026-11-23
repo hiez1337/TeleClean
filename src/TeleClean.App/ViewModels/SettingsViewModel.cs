@@ -1,9 +1,13 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using TeleClean.App.Helpers;
 using TeleClean.App.Messages;
 using TeleClean.App.Services;
 using TeleClean.Core.Interfaces;
@@ -17,6 +21,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private readonly ICacheService _cacheService;
     private readonly ITelegramService _telegramService;
     private AppConfig _config = new();
+    private CancellationTokenSource? _delayDebounceCts;
+    private bool _isInitializing;
 
     [ObservableProperty]
     private int _selectedThemeIndex = 0; // 0: System, 1: Light, 2: Dark
@@ -37,12 +43,16 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private string _proxyUrl = string.Empty;
 
-    private bool _isInitializing;
+    [ObservableProperty]
+    private bool _hasProxyConfigured;
 
     public string DelaySecondsText => $"{DelayBetweenRequests:F1} сек";
-    public string AppVersionText => $"TeleClean {typeof(App).Assembly.GetName().Version?.ToString(3)}";
+    public string AppVersionText => $"TeleClean {typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3) ?? "3.1.0"}";
     public string DataDirectory => _configService.GetDataDirectory();
     public string SessionStatusText => _telegramService.IsAuthorized ? "Сессия: Активна" : "Сессия: Не авторизован";
+    public string SessionDescriptionText => _telegramService.IsAuthorized
+        ? "Сессия активна. Выход завершит текущую сессию TeleClean на этом устройстве."
+        : "Авторизация не активна.";
     public string SettingsFooterText => $"{AppVersionText} | Хранилище: {_configService.GetDataDirectory()} | {(_telegramService.IsAuthorized ? "Сессия: Активна" : "Сессия: Требуется вход")}";
 
     public SettingsViewModel(
@@ -84,8 +94,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
             ApiHash = effHash;
             DelayBetweenRequests = _config.DefaultDelaySeconds > 0 ? _config.DefaultDelaySeconds : 3.0;
             ProxyUrl = _config.ProxyUrl ?? string.Empty;
+            HasProxyConfigured = !string.IsNullOrWhiteSpace(_config.ProxyUrl);
 
             OnPropertyChanged(nameof(SessionStatusText));
+            OnPropertyChanged(nameof(SessionDescriptionText));
             OnPropertyChanged(nameof(SettingsFooterText));
         }
         catch
@@ -136,13 +148,35 @@ public sealed partial class SettingsViewModel : ViewModelBase
     partial void OnDelayBetweenRequestsChanged(double value)
     {
         if (_isInitializing) return;
-        _config.DefaultDelaySeconds = Math.Round(value, 1);
-        _ = SavePreferencesAsync();
+        _config.DefaultDelaySeconds = Math.Clamp(Math.Round(value, 1), 1.0, 10.0);
+
+        _delayDebounceCts?.Cancel();
+        _delayDebounceCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _delayDebounceCts = cts;
+        _ = DebouncedSavePreferencesAsync(cts);
     }
 
-    private async Task SavePreferencesAsync()
+    private async Task DebouncedSavePreferencesAsync(CancellationTokenSource cts)
     {
-        try { await _configService.SaveConfigAsync(_config); }
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            if (!cts.IsCancellationRequested)
+            {
+                await SavePreferencesAsync(cts.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer slider movement.
+        }
+    }
+
+    private async Task SavePreferencesAsync(CancellationToken ct = default)
+    {
+        try { await _configService.SaveConfigAsync(_config, ct); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch
         {
             ErrorMessage = "Не удалось сохранить настройки. Проверьте доступ к папке данных.";
@@ -152,8 +186,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     public async Task SaveApiKeysAsync()
     {
+        if (!double.IsFinite(ApiId))
+        {
+            ErrorMessage = "Введите корректные API ID и API Hash.";
+            return;
+        }
+
         int id = (int)ApiId;
-        if (id <= 0 || id != ApiId || ApiHash.Trim().Length != 32 || !System.Linq.Enumerable.All(ApiHash.Trim(), Uri.IsHexDigit))
+        string trimmedHash = ApiHash.Trim();
+        if (id <= 0 || id != ApiId || trimmedHash.Length != 32 || !trimmedHash.All(Uri.IsHexDigit))
         {
             ErrorMessage = "Введите корректные API ID и API Hash.";
             return;
@@ -162,15 +203,15 @@ public sealed partial class SettingsViewModel : ViewModelBase
         try
         {
             _config.ApiId = id;
-            _config.ApiHash = ApiHash.Trim();
+            _config.ApiHash = trimmedHash;
             _config.ApiKeys = new ApiKeysConfig
             {
                 ApiId = id,
-                ApiHash = ApiHash.Trim()
+                ApiHash = trimmedHash
             };
 
             await _configService.SaveConfigAsync(_config);
-            StatusMessage = "API ключи успешно сохранены.";
+            StatusMessage = "API ключи сохранены. Изменения вступят в силу при перезапуске.";
             ErrorMessage = null;
         }
         catch
@@ -182,11 +223,20 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     public async Task SaveProxyAsync()
     {
+        if (!ProxyUrlValidator.TryValidateAndNormalize(ProxyUrl, out string? normalized, out string? validationError))
+        {
+            ErrorMessage = validationError;
+            StatusMessage = null;
+            return;
+        }
+
         try
         {
-            _config.ProxyUrl = string.IsNullOrWhiteSpace(ProxyUrl) ? null : ProxyUrl.Trim();
+            _config.ProxyUrl = normalized;
+            ProxyUrl = normalized ?? string.Empty;
+            HasProxyConfigured = normalized != null;
             await _configService.SaveConfigAsync(_config);
-            StatusMessage = string.IsNullOrWhiteSpace(_config.ProxyUrl)
+            StatusMessage = normalized == null
                 ? "Прокси отключён. Перезапустите приложение."
                 : "Прокси сохранён. Перезапустите приложение для применения.";
             ErrorMessage = null;
@@ -221,6 +271,25 @@ public sealed partial class SettingsViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    public void OpenDataDirectory()
+    {
+        try
+        {
+            string dir = DataDirectory;
+            Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            ErrorMessage = "Не удалось открыть папку данных в Проводнике.";
+        }
+    }
+
+    [RelayCommand]
     public async Task ResetSessionAsync()
     {
         IsBusy = true;
@@ -230,6 +299,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
             StatusMessage = "Сессия сброшена.";
             ErrorMessage = null;
+            OnPropertyChanged(nameof(SessionStatusText));
+            OnPropertyChanged(nameof(SessionDescriptionText));
+            OnPropertyChanged(nameof(SettingsFooterText));
 
             WeakReferenceMessenger.Default.Send(new AuthenticationStateChangedMessage(false));
         }
@@ -241,5 +313,13 @@ public sealed partial class SettingsViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    public override void Dispose()
+    {
+        _delayDebounceCts?.Cancel();
+        _delayDebounceCts?.Dispose();
+        _delayDebounceCts = null;
+        base.Dispose();
     }
 }
