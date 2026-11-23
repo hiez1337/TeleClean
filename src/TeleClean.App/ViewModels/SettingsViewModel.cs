@@ -28,7 +28,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     private int _selectedThemeIndex = 0; // 0: System, 1: Light, 2: Dark
 
     [ObservableProperty]
-    private int _selectedBackdropIndex = 0; // 0: Mica, 1: Mica Alt, 2: Acrylic
+    private int _selectedBackdropIndex = 0; // 0: Mica, 1: Mica Alt, 2: Acrylic, 3: Solid
 
     [ObservableProperty]
     private double _apiId;
@@ -86,6 +86,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             {
                 "MicaAlt" => 1,
                 "Acrylic" => 2,
+                "Solid" => 3,
                 _ => 0
             };
 
@@ -136,6 +137,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         {
             1 => "MicaAlt",
             2 => "Acrylic",
+            3 => "Solid",
             _ => "Mica"
         };
 

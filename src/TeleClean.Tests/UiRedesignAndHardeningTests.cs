@@ -153,26 +153,39 @@ public sealed class UiRedesignAndHardeningTests
             await vm.SaveApiKeysAsync();
             Assert.True(vm.HasError);
 
-            // Theme change publishes ThemeChangedMessage
+            // Theme and backdrop changes publish messages and persist all 4 backdrop options
             string? observedTheme = null;
+            string? observedBackdrop = null;
             var recipient = new object();
             WeakReferenceMessenger.Default.Register<ThemeChangedMessage>(recipient, (_, msg) => observedTheme = msg.Value);
+            WeakReferenceMessenger.Default.Register<BackdropChangedMessage>(recipient, (_, msg) => observedBackdrop = msg.Value);
             try
             {
                 vm.SelectedThemeIndex = 1; // Light
                 Assert.Equal("light", observedTheme);
+
+                vm.SelectedBackdropIndex = 2; // Acrylic
+                Assert.Equal("Acrylic", observedBackdrop);
+
+                vm.SelectedBackdropIndex = 3; // Solid
+                Assert.Equal("Solid", observedBackdrop);
             }
             finally
             {
                 WeakReferenceMessenger.Default.UnregisterAll(recipient);
             }
 
-            // Debounced delay save persists the latest value
+            // Debounced delay save persists the latest value and Solid backdrop reloads as index 3
             vm.DelayBetweenRequests = 4.5;
             vm.DelayBetweenRequests = 6.5;
             await Task.Delay(400);
             var saved = await configService.LoadConfigAsync();
             Assert.Equal(6.5, saved.DefaultDelaySeconds);
+            Assert.Equal("Solid", saved.Backdrop);
+
+            using var reloadedVm = new SettingsViewModel(new ConfigService(tempDir), cache, telegram, new InlineDispatcher());
+            await reloadedVm.InitializeAsync();
+            Assert.Equal(3, reloadedVm.SelectedBackdropIndex);
         }
         finally
         {

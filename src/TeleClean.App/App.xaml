@@ -11,14 +11,15 @@
             <ResourceDictionary.ThemeDictionaries>
                 <!-- Dark Theme (Default) -->
                 <ResourceDictionary x:Key="Default">
-                    <SolidColorBrush x:Key="ContentCanvasBrush" Color="#661A1C20"/>
-                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#CC262930"/>
-                    <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="#99202329"/>
-                    <SolidColorBrush x:Key="CardBorderBrush" Color="#18FFFFFF"/>
-                    <SolidColorBrush x:Key="TableHeaderBrush" Color="#0CFFFFFF"/>
+                    <SolidColorBrush x:Key="SolidShellBrush" Color="#FF191B1F"/>
+                    <SolidColorBrush x:Key="ContentCanvasBrush" Color="#0CFFFFFF"/>
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#13FFFFFF"/>
+                    <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="#0AFFFFFF"/>
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#1CFFFFFF"/>
+                    <SolidColorBrush x:Key="TableHeaderBrush" Color="#0DFFFFFF"/>
                     <SolidColorBrush x:Key="SubtleDividerBrush" Color="#14FFFFFF"/>
-                    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="#0EFFFFFF"/>
-                    <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="#2638A3F1"/>
+                    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="#10FFFFFF"/>
+                    <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="#2838A3F1"/>
                     <SolidColorBrush x:Key="RowSelectedBorderBrush" Color="#6638A3F1"/>
 
                     <SolidColorBrush x:Key="BrandPrimaryBrush" Color="#38A3F1"/>
@@ -27,14 +28,14 @@
                     <SolidColorBrush x:Key="OnBrandBrush" Color="#071929"/>
 
                     <SolidColorBrush x:Key="StatusNeutralBgBrush" Color="#14FFFFFF"/>
-                    <SolidColorBrush x:Key="StatusNeutralFgBrush" Color="#B6BEC9"/>
+                    <SolidColorBrush x:Key="StatusNeutralFgBrush" Color="#C0C7D2"/>
                     <SolidColorBrush x:Key="StatusNeutralDotBrush" Color="#8E98A6"/>
 
                     <SolidColorBrush x:Key="StatusAccentBgBrush" Color="#2638A3F1"/>
                     <SolidColorBrush x:Key="StatusAccentFgBrush" Color="#7CCBFF"/>
                     <SolidColorBrush x:Key="StatusAccentDotBrush" Color="#38A3F1"/>
 
-                    <SolidColorBrush x:Key="StatusSuccessBgBrush" Color="#202EC76E"/>
+                    <SolidColorBrush x:Key="StatusSuccessBgBrush" Color="#222EC76E"/>
                     <SolidColorBrush x:Key="StatusSuccessFgBrush" Color="#6CE59E"/>
                     <SolidColorBrush x:Key="StatusSuccessDotBrush" Color="#39D97E"/>
 
@@ -53,27 +54,28 @@
                     <SolidColorBrush x:Key="DestructiveFgBrush" Color="#FF9494"/>
 
                     <SolidColorBrush x:Key="QrFrameBorderBrush" Color="#24FFFFFF"/>
-                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#661A1C20"/>
+                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#0CFFFFFF"/>
                     <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#18FFFFFF"/>
 
-                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#CC262930"/>
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#DE2D3139"/>
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#E6323740"/>
-                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#B821242B"/>
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#18FFFFFF"/>
-                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#18FFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#13FFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#1CFFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#0EFFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#0CFFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#1CFFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#1CFFFFFF"/>
                 </ResourceDictionary>
 
                 <!-- Light Theme -->
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="ContentCanvasBrush" Color="#78FFFFFF"/>
-                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#FAFFFFFF"/>
-                    <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="#FFF4F6F9"/>
-                    <SolidColorBrush x:Key="CardBorderBrush" Color="#16000000"/>
-                    <SolidColorBrush x:Key="TableHeaderBrush" Color="#06000000"/>
+                    <SolidColorBrush x:Key="SolidShellBrush" Color="#FFF1F4F8"/>
+                    <SolidColorBrush x:Key="ContentCanvasBrush" Color="#54FFFFFF"/>
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#B8FFFFFF"/>
+                    <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="#7AFFFFFF"/>
+                    <SolidColorBrush x:Key="CardBorderBrush" Color="#15000000"/>
+                    <SolidColorBrush x:Key="TableHeaderBrush" Color="#07000000"/>
                     <SolidColorBrush x:Key="SubtleDividerBrush" Color="#10000000"/>
-                    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="#08000000"/>
-                    <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="#181477C8"/>
+                    <SolidColorBrush x:Key="RowHoverBackgroundBrush" Color="#09000000"/>
+                    <SolidColorBrush x:Key="RowSelectedBackgroundBrush" Color="#1A1477C8"/>
                     <SolidColorBrush x:Key="RowSelectedBorderBrush" Color="#661477C8"/>
 
                     <SolidColorBrush x:Key="BrandPrimaryBrush" Color="#1477C8"/>
@@ -108,19 +110,20 @@
                     <SolidColorBrush x:Key="DestructiveFgBrush" Color="#B01F12"/>
 
                     <SolidColorBrush x:Key="QrFrameBorderBrush" Color="#20000000"/>
-                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#78FFFFFF"/>
-                    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#16000000"/>
+                    <SolidColorBrush x:Key="NavigationViewContentBackground" Color="#54FFFFFF"/>
+                    <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="#15000000"/>
 
-                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#FAFFFFFF"/>
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#FFF7F9FC"/>
-                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#FFEDF1F6"/>
-                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#F2F8FAFC"/>
-                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#16000000"/>
-                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#16000000"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackground" Color="#B8FFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="#D8FFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="#A6FFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderContentBackground" Color="#88FFFFFF"/>
+                    <SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="#15000000"/>
+                    <SolidColorBrush x:Key="ExpanderContentBorderBrush" Color="#15000000"/>
                 </ResourceDictionary>
 
                 <!-- HighContrast Theme -->
                 <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="SolidShellBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="ContentCanvasBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="CardSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}"/>
                     <SolidColorBrush x:Key="CardSurfaceSubtleBrush" Color="{ThemeResource SystemColorWindowColor}"/>
